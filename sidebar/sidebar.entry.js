@@ -66,8 +66,18 @@ async function onSidebarLoad() {
   const tabs = await browser.tabs.query({ active: true, currentWindow: true });
   if (tabs.length) currentTabId = tabs[0].id;
 
-  console.log('[gemini-sidebar] sidebar loaded, waiting for injector...');
-  await new Promise((r) => setTimeout(r, 3000));
+  console.log('[gemini-sidebar] sidebar loaded, checking injector...');
+  await new Promise((r) => setTimeout(r, 4000));
+
+  const iframe = document.getElementById('gemini');
+  console.log('[gemini-sidebar] iframe src:', iframe?.src);
+  console.log('[gemini-sidebar] iframe contentWindow:', iframe?.contentWindow ? 'exists' : 'null');
+
+  if (iframe?.contentWindow) {
+    console.log('[gemini-sidebar] sending GET_URL to check injector...');
+    const url = await getCurrentGeminiUrl();
+    console.log('[gemini-sidebar] injector responded with URL:', url);
+  }
 
   const prefs = await getPrefs();
   if (prefs.tempChat) {
