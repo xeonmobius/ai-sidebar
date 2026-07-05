@@ -26,9 +26,9 @@ const firefoxManifest = JSON.parse(readFileSync('manifest.json', 'utf8'));
 delete firefoxManifest.background.service_worker;
 firefoxManifest.background.scripts = ['background/sw.js'];
 firefoxManifest.permissions = firefoxManifest.permissions
-  .filter((p) => p !== 'sidePanel')
-  .map((p) => p === 'declarativeNetRequest' ? 'declarativeNetRequestWithHostAccess' : p);
+  .filter((p) => p !== 'sidePanel');
 delete firefoxManifest.side_panel;
+// Keep declarativeNetRequest permission as-is for Firefox (required for static rules)
 // Keep sidebar_action (Firefox-native) and browser_specific_settings
 
 function buildFor(target, manifest) {
