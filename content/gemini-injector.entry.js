@@ -61,10 +61,13 @@ async function handleAttach(msg) {
 }
 
 browser.runtime.onMessage.addListener((msg) => {
-  if (msg.type === 'GET_URL') {
-    browser.runtime.sendMessage({ type: 'CURRENT_URL', url: location.href }).catch(() => {});
-    return;
-  }
   if (msg.type === 'ATTACH_FILE') return handleAttach(msg);
 });
+
+window.addEventListener('message', (event) => {
+  if (event.data?.type === 'GET_URL') {
+    window.postMessage({ type: 'CURRENT_URL', url: location.href }, '*');
+  }
+});
+
 browser.runtime.sendMessage({ type: 'INJECTOR_READY' }).catch(() => {});
