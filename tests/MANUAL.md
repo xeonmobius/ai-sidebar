@@ -1,8 +1,8 @@
 # Manual Test Matrix — Gemini Sidebar
 
 Run for **both Chrome and Firefox** before each release. Load `dist/` as unpacked extension
-(Chrome: chrome://extensions → Developer mode → Load unpacked. Firefox: about:debugging →
-This Firefox → Load Temporary Add-on → select dist/manifest.json).
+(Chrome: chrome://extensions → Developer mode → Load unpacked → select dist/chrome/. Firefox: about:debugging →
+This Firefox → Load Temporary Add-on → select dist/firefox/manifest.json).
 
 ## Setup
 - [ ] Log into gemini.google.com in a normal browser tab first (work account with Gemini Pro).

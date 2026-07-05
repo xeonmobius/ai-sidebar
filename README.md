@@ -7,8 +7,8 @@ Chrome + Firefox. Manifest V3.
 ## Install (developer / sideload)
 
 1. `bun install && bun run build`
-2. **Chrome:** `chrome://extensions` → enable Developer mode → "Load unpacked" → select `dist/`.
-3. **Firefox:** `about:debugging` → "This Firefox" → "Load Temporary Add-on" → select `dist/manifest.json`.
+2. **Chrome:** `chrome://extensions` → enable Developer mode → "Load unpacked" → select `dist/chrome/`.
+3. **Firefox:** `about:debugging` → "This Firefox" → "Load Temporary Add-on" → select `dist/firefox/manifest.json`.
 4. Log into `gemini.google.com` in a normal tab first.
 5. Click the toolbar icon (or Ctrl/Cmd+Shift+G).
 
@@ -28,5 +28,6 @@ No telemetry. No remote requests except to `gemini.google.com`. All data stays l
 ## Develop
 - `bun test` — vitest unit tests
 - `bun run lint` — eslint
-- `bun run build` — bundle to `dist/`
-- `bun run lint:ext` — web-ext manifest validation
+- `bun run build` — bundle to `dist/chrome/` and `dist/firefox/`
+- `bun run lint:ext:chrome` — web-ext manifest validation (Chrome)
+- `bun run lint:ext:firefox` — web-ext manifest validation (Firefox)
