@@ -109,13 +109,17 @@ browser.runtime.onMessage.addListener((msg) => {
     return;
   }
   if (msg.type === 'ATTACH_FILE') {
+    console.log('[gemini-sidebar] ATTACH_FILE received:', msg.filename, msg.markdown?.length, 'chars');
     const iframe = document.getElementById('gemini');
     if (iframe?.contentWindow) {
       const file = new File([msg.markdown], msg.filename, { type: 'text/markdown' });
+      console.log('[gemini-sidebar] posting ATTACH_FILE to iframe');
       iframe.contentWindow.postMessage(
         { type: 'ATTACH_FILE', file: file },
         '*'
       );
+    } else {
+      console.log('[gemini-sidebar] no iframe to post ATTACH_FILE to');
     }
   }
 });

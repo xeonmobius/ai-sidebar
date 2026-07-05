@@ -84,8 +84,12 @@ window.addEventListener('message', (event) => {
     }
   }
   if (event.data?.type === 'ATTACH_FILE' && event.data.file) {
+    console.log('[gemini-injector] ATTACH_FILE received via postMessage:', event.data.file.name);
     waitForGeminiReady().then(() => {
+      console.log('[gemini-injector] Gemini ready, handling attach');
       handleAttach(event.data);
+    }).catch((e) => {
+      console.log('[gemini-injector] Gemini not ready:', e.message);
     });
   }
 });
