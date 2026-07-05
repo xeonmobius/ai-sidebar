@@ -25,8 +25,11 @@ const chromeManifest = JSON.parse(readFileSync('manifest.json', 'utf8'));
 const firefoxManifest = JSON.parse(readFileSync('manifest.json', 'utf8'));
 delete firefoxManifest.background.service_worker;
 firefoxManifest.background.scripts = ['background/sw.js'];
-firefoxManifest.permissions = firefoxManifest.permissions.filter((p) => p !== 'sidePanel');
-// Keep browser_specific_settings for Firefox (gecko ID + strict_min_version)
+firefoxManifest.permissions = firefoxManifest.permissions
+  .filter((p) => p !== 'sidePanel')
+  .map((p) => p === 'declarativeNetRequest' ? 'declarativeNetRequestWithHostAccess' : p);
+delete firefoxManifest.side_panel;
+// Keep sidebar_action (Firefox-native) and browser_specific_settings
 
 function buildFor(target, manifest) {
   const outDir = `dist/${target}`;

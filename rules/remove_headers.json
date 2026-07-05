@@ -11,7 +11,7 @@
       ]
     },
     "condition": {
-      "urlFilter": "||gemini.google.com",
+      "urlFilter": "*://gemini.google.com/*",
       "resourceTypes": ["main_frame", "sub_frame"]
     }
   }
