@@ -70,6 +70,7 @@ browser.runtime.onMessage.addListener((msg) => {
 
 window.addEventListener('message', (event) => {
   if (event.data?.type === 'GET_URL') {
+    console.log('[gemini-injector] GET_URL received, responding with:', location.href);
     window.parent.postMessage({ type: 'CURRENT_URL', url: location.href }, '*');
   }
   if (event.data?.type === 'CLICK_TEMP_CHAT') {
