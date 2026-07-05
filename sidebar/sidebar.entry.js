@@ -4,6 +4,7 @@ const GEMINI_BASE = 'https://gemini.google.com/app';
 const iframes = new Map();
 let currentTabId = null;
 let lastUploadTab = null;
+let sidebarEnabled = false;
 
 async function getPrefs() {
   const result = await browser.storage.local.get('prefs');
@@ -21,11 +22,8 @@ function createIframe(tabId) {
   const iframe = document.createElement('iframe');
   iframe.id = 'gemini-' + tabId;
   iframe.src = GEMINI_BASE;
-  iframe.style.width = '100%';
-  iframe.style.height = '100%';
-  iframe.style.border = 'none';
-  iframe.style.display = 'none';
-  document.body.appendChild(iframe);
+  iframe.style.cssText = 'width:100%;height:100%;border:none;display:none;position:absolute;top:0;left:0;';
+  document.getElementById('iframe-container').appendChild(iframe);
   iframes.set(tabId, iframe);
   return iframe;
 }
@@ -42,6 +40,19 @@ function removeIframe(tabId) {
     iframe.remove();
     iframes.delete(tabId);
   }
+}
+
+function showDisabled() {
+  document.getElementById('disabled-panel').style.display = 'flex';
+  for (const iframe of iframes.values()) {
+    iframe.style.display = 'none';
+  }
+}
+
+function showEnabled(tabId) {
+  document.getElementById('disabled-panel').style.display = 'none';
+  createIframe(tabId);
+  showIframe(tabId);
 }
 
 async function triggerUpload() {
@@ -61,34 +72,41 @@ async function triggerUpload() {
   }
 }
 
-async function onSidebarLoad() {
-  const tabs = await browser.tabs.query({ active: true, currentWindow: true });
-  if (tabs.length) currentTabId = tabs[0].id;
+async function enableSidebar(tabId) {
+  sidebarEnabled = true;
+  currentTabId = tabId;
+  showEnabled(tabId);
 
-  const iframe = createIframe(currentTabId);
-  showIframe(currentTabId);
-
+  const isNew = !iframes.has(tabId) || true;
   await new Promise((r) => setTimeout(r, 4000));
 
   const prefs = await getPrefs();
+  const iframe = getIframe(tabId);
   if (prefs.tempChat && iframe?.contentWindow) {
     iframe.contentWindow.postMessage({ type: 'CLICK_TEMP_CHAT' }, '*');
   }
   await triggerUpload();
 }
 
-async function onTabChanged(newTabId) {
-  if (currentTabId === newTabId) return;
+function disableSidebar() {
+  sidebarEnabled = false;
+  showDisabled();
+}
 
-  showIframe(newTabId);
+async function onTabChanged(newTabId, enabled) {
+  if (!enabled) {
+    disableSidebar();
+    return;
+  }
 
-  const isNew = !iframes.has(newTabId);
-  if (isNew) {
-    const iframe = createIframe(newTabId);
-    showIframe(newTabId);
+  sidebarEnabled = true;
+  const wasNew = !iframes.has(newTabId);
+  showEnabled(newTabId);
+
+  if (wasNew) {
     await new Promise((r) => setTimeout(r, 4000));
-
     const prefs = await getPrefs();
+    const iframe = getIframe(newTabId);
     if (prefs.tempChat && iframe?.contentWindow) {
       iframe.contentWindow.postMessage({ type: 'CLICK_TEMP_CHAT' }, '*');
     }
@@ -99,15 +117,27 @@ async function onTabChanged(newTabId) {
   await triggerUpload();
 }
 
-onSidebarLoad();
+(async () => {
+  const tabs = await browser.tabs.query({ active: true, currentWindow: true });
+  if (tabs.length) currentTabId = tabs[0].id;
+  showDisabled();
+})();
 
 browser.tabs.onRemoved.addListener((tabId) => {
   removeIframe(tabId);
 });
 
 browser.runtime.onMessage.addListener((msg) => {
+  if (msg.type === 'SIDEBAR_TOGGLED') {
+    if (msg.enabled) {
+      enableSidebar(msg.tabId);
+    } else {
+      disableSidebar();
+    }
+    return;
+  }
   if (msg.type === 'TAB_CHANGED') {
-    onTabChanged(msg.tabId);
+    onTabChanged(msg.tabId, msg.enabled);
     return;
   }
   if (msg.type === 'ATTACH_FILE') {
