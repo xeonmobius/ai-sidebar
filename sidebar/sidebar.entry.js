@@ -123,7 +123,12 @@ browser.runtime.onMessage.addListener((msg) => {
   if (msg.type === 'ATTACH_PDF') {
     const iframe = getIframe(currentTabId);
     if (iframe?.contentWindow) {
-      const file = new File([msg.arrayBuffer], msg.filename, { type: msg.mimeType || 'application/pdf' });
+      const binary = atob(msg.base64);
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) {
+        bytes[i] = binary.charCodeAt(i);
+      }
+      const file = new File([bytes], msg.filename, { type: msg.mimeType || 'application/pdf' });
       iframe.contentWindow.postMessage(
         { type: 'ATTACH_FILE', file: file },
         '*'
