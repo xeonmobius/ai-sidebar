@@ -11,39 +11,44 @@ async function runExtraction(tabId) {
   });
 }
 
+async function sendToSidebar(markdown, filename) {
+  browser.runtime
+    .sendMessage({ type: 'ATTACH_FILE', markdown, filename })
+    .catch(() => {})
+    .finally(() => { activeSession = null; });
+}
+
 async function triggerUpload() {
-  if (activeSession) {
-    console.log('[gemini-sidebar] session active, skipping');
-    return;
-  }
+  if (activeSession) return;
 
   const [sourceTab] = await browser.tabs.query({ active: true, currentWindow: true });
   if (!sourceTab) return;
 
   activeSession = { tabId: sourceTab.id };
-  console.log('[gemini-sidebar] triggerUpload, source tab:', sourceTab.id);
+
+  const url = sourceTab.url || '';
+  const isPdf = sourceTab.isArticle === false && /\.(pdf)$/i.test(url);
 
   try {
-    console.log('[gemini-sidebar] extracting source page...');
     await runExtraction(sourceTab.id);
-    console.log('[gemini-sidebar] extractor injected, waiting for EXTRACT_RESULT...');
   } catch (err) {
     activeSession = null;
+    if (url.startsWith('file://') || url.startsWith('resource://') || url.startsWith('about:')) {
+      console.log('[gemini-sidebar] cannot extract restricted URL, skipping:', url);
+      return;
+    }
     console.error('[gemini-sidebar] extraction failed:', err);
   }
 }
 
 browser.runtime.onMessage.addListener((msg) => {
   if (msg.type === 'TRIGGER_UPLOAD') {
-    console.log('[gemini-sidebar] TRIGGER_UPLOAD received');
     triggerUpload();
     return;
   }
 
   if (msg.type === 'EXTRACT_RESULT') {
-    console.log('[gemini-sidebar] EXTRACT_RESULT received');
     if (msg.error) {
-      console.error('[gemini-sidebar] extract error:', msg.error);
       activeSession = null;
       return;
     }
@@ -51,13 +56,8 @@ browser.runtime.onMessage.addListener((msg) => {
     const title = msg.result?.title || 'page';
     const markdown = msg.result?.markdown || '';
     const filename = `${slug(title)}.md`;
-    console.log('[gemini-sidebar] sending to sidebar:', filename, markdown.length, 'chars');
 
-    browser.runtime
-      .sendMessage({ type: 'ATTACH_FILE', markdown, filename })
-      .then(() => console.log('[gemini-sidebar] sidebar acknowledged ATTACH_FILE'))
-      .catch((e) => console.warn('[gemini-sidebar] sidebar not listening:', e))
-      .finally(() => { activeSession = null; });
+    sendToSidebar(markdown, filename);
     return;
   }
 });
