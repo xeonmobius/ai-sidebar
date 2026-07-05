@@ -67,5 +67,6 @@ browser.action.onClicked.addListener(() => {
 });
 
 browser.tabs.onActivated.addListener((activeInfo) => {
+  activeSession = null;
   browser.runtime.sendMessage({ type: 'TAB_CHANGED', tabId: activeInfo.tabId }).catch(() => {});
 });

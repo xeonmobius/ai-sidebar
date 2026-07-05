@@ -65,10 +65,11 @@ async function onSidebarLoad() {
 
 async function onTabChanged(newTabId) {
   const prefs = await getPrefs();
+  const oldTabId = currentTabId;
 
-  if (!prefs.tempChat && currentTabId !== null) {
+  if (!prefs.tempChat && oldTabId !== null) {
     const url = await getCurrentGeminiUrl();
-    tabUrls.set(currentTabId, url);
+    tabUrls.set(oldTabId, url);
   }
 
   currentTabId = newTabId;
