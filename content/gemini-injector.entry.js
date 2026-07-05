@@ -49,12 +49,11 @@ async function handleAttach(msg) {
   }
 }
 
-browser.runtime.onMessage.addListener((msg) => {
-  if (msg.type === 'ATTACH_FILE') {
-    handleAttach(msg);
-    return true;
+window.addEventListener('message', (event) => {
+  if (event.data?.type === 'GET_URL') {
+    window.parent.postMessage({ type: 'CURRENT_URL', url: location.href }, '*');
   }
-  if (msg.type === 'CLICK_TEMP_CHAT') {
+  if (event.data?.type === 'CLICK_TEMP_CHAT') {
     const buttons = document.querySelectorAll('button, [role="button"]');
     for (const btn of buttons) {
       const text = btn.textContent?.toLowerCase() || '';
@@ -63,5 +62,10 @@ browser.runtime.onMessage.addListener((msg) => {
         break;
       }
     }
+  }
+  if (event.data?.type === 'ATTACH_FILE' && event.data.file) {
+    waitForSelector(SELECTORS.fileInput, { timeout: ATTACH_TIMEOUT_MS }).then(() => {
+      handleAttach(event.data);
+    }).catch(() => {});
   }
 });

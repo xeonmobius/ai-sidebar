@@ -4,51 +4,82 @@ const GEMINI_BASE = 'https://gemini.google.com/app';
 const tabUrls = new Map();
 let currentTabId = null;
 let lastUploadTab = null;
-let geminiTabId = null;
 
 async function getPrefs() {
   const result = await browser.storage.local.get('prefs');
   return { tempChat: false, ...result?.prefs };
 }
 
-async function ensureGeminiTab() {
-  if (geminiTabId !== null) {
-    try {
-      const tab = await browser.tabs.get(geminiTabId);
-      if (tab && tab.url?.includes('gemini.google.com')) {
-        return geminiTabId;
+async function injectIntoIframe() {
+  try {
+    const tabs = await browser.tabs.query({ active: true, currentWindow: true });
+    if (!tabs.length) return;
+    const tabId = tabs[0].id;
+
+    const frames = await browser.webNavigation.getAllFrames({ tabId });
+    console.log('[gemini-sidebar] found frames:', frames.map(f => f.url));
+
+    const geminiFrame = frames.find(f => f.url.includes('gemini.google.com'));
+    if (!geminiFrame) {
+      console.log('[gemini-sidebar] no gemini frame, trying all frames...');
+      for (const frame of frames) {
+        if (frame.parentFrameId !== -1) {
+          console.log('[gemini-sidebar] injecting into child frame:', frame.url);
+          await browser.scripting.executeScript({
+            target: { tabId, frameId: frame.frameId },
+            files: ['content/gemini-injector.bundle.js'],
+          }).catch(e => console.log('[gemini-sidebar] inject failed for frame:', e.message));
+        }
       }
-    } catch {
-      geminiTabId = null;
+      return;
     }
-  }
 
-  const tabs = await browser.tabs.query({ url: 'https://gemini.google.com/*' });
-  if (tabs.length) {
-    geminiTabId = tabs[0].id;
-    return geminiTabId;
+    console.log('[gemini-sidebar] injecting into gemini frame:', geminiFrame.url);
+    await browser.scripting.executeScript({
+      target: { tabId, frameId: geminiFrame.frameId },
+      files: ['content/gemini-injector.bundle.js'],
+    });
+    console.log('[gemini-sidebar] injection complete');
+  } catch (e) {
+    console.log('[gemini-sidebar] inject failed:', e.message);
   }
+}
 
-  const tab = await browser.tabs.create({ url: GEMINI_BASE, active: false });
-  geminiTabId = tab.id;
-  await new Promise((r) => setTimeout(r, 3000));
-  return geminiTabId;
+function setupIframeObserver() {
+  const iframe = document.getElementById('gemini');
+  if (!iframe) return;
+
+  iframe.addEventListener('load', async () => {
+    console.log('[gemini-sidebar] iframe loaded, re-injecting...');
+    await new Promise((r) => setTimeout(r, 1500));
+    await injectIntoIframe();
+  });
 }
 
 async function getCurrentGeminiUrl() {
-  if (geminiTabId === null) return GEMINI_BASE;
-  try {
-    const tab = await browser.tabs.get(geminiTabId);
-    return tab?.url || GEMINI_BASE;
-  } catch {
+  const iframe = document.getElementById('gemini');
+  if (!iframe?.contentWindow) {
+    console.log('[gemini-sidebar] getCurrentGeminiUrl: no iframe');
     return GEMINI_BASE;
   }
-}
-
-async function navigateGemini(url) {
-  const tabId = await ensureGeminiTab();
-  await browser.tabs.update(tabId, { url });
-  await new Promise((r) => setTimeout(r, 3000));
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => {
+      console.log('[gemini-sidebar] getCurrentGeminiUrl: TIMEOUT');
+      window.removeEventListener('message', handler);
+      resolve(GEMINI_BASE);
+    }, 2000);
+    function handler(event) {
+      if (event.data?.type === 'CURRENT_URL') {
+        console.log('[gemini-sidebar] getCurrentGeminiUrl: got', event.data.url);
+        clearTimeout(timer);
+        window.removeEventListener('message', handler);
+        resolve(event.data.url);
+      }
+    }
+    window.addEventListener('message', handler);
+    console.log('[gemini-sidebar] getCurrentGeminiUrl: sending GET_URL');
+    iframe.contentWindow.postMessage({ type: 'GET_URL' }, '*');
+  });
 }
 
 async function triggerUpload() {
@@ -71,8 +102,21 @@ async function triggerUpload() {
 async function onSidebarLoad() {
   const tabs = await browser.tabs.query({ active: true, currentWindow: true });
   if (tabs.length) currentTabId = tabs[0].id;
+  console.log('[gemini-sidebar] sidebar loaded, currentTabId:', currentTabId);
 
-  await ensureGeminiTab();
+  setupIframeObserver();
+  await new Promise((r) => setTimeout(r, 3000));
+  await injectIntoIframe();
+  await new Promise((r) => setTimeout(r, 1000));
+
+  const prefs = await getPrefs();
+  console.log('[gemini-sidebar] tempChat:', prefs.tempChat);
+  if (prefs.tempChat) {
+    const iframe = document.getElementById('gemini');
+    if (iframe?.contentWindow) {
+      iframe.contentWindow.postMessage({ type: 'CLICK_TEMP_CHAT' }, '*');
+    }
+  }
   await triggerUpload();
 }
 
@@ -80,9 +124,13 @@ async function onTabChanged(newTabId) {
   const prefs = await getPrefs();
   const oldTabId = currentTabId;
 
+  console.log('[gemini-sidebar] TAB_CHANGED:', newTabId, 'from:', oldTabId, 'tempChat:', prefs.tempChat);
+
   if (!prefs.tempChat && oldTabId !== null) {
     const url = await getCurrentGeminiUrl();
+    console.log('[gemini-sidebar] saving URL for tab', oldTabId, ':', url);
     tabUrls.set(oldTabId, url);
+    console.log('[gemini-sidebar] tabUrls now has', tabUrls.size, 'entries');
   }
 
   currentTabId = newTabId;
@@ -91,9 +139,26 @@ async function onTabChanged(newTabId) {
   let targetUrl = GEMINI_BASE;
   if (!prefs.tempChat && tabUrls.has(newTabId)) {
     targetUrl = tabUrls.get(newTabId);
+    console.log('[gemini-sidebar] RESTORING URL for tab', newTabId, ':', targetUrl);
+  } else {
+    console.log('[gemini-sidebar] no saved URL for tab', newTabId, ', using fresh chat');
   }
 
-  await navigateGemini(targetUrl);
+  const iframe = document.getElementById('gemini');
+  if (iframe) {
+    console.log('[gemini-sidebar] setting iframe.src to:', targetUrl);
+    iframe.src = targetUrl;
+  }
+  await new Promise((r) => setTimeout(r, 3000));
+  await injectIntoIframe();
+  await new Promise((r) => setTimeout(r, 1000));
+
+  if (prefs.tempChat) {
+    const iframe = document.getElementById('gemini');
+    if (iframe?.contentWindow) {
+      iframe.contentWindow.postMessage({ type: 'CLICK_TEMP_CHAT' }, '*');
+    }
+  }
   await triggerUpload();
 }
 
@@ -104,15 +169,14 @@ browser.runtime.onMessage.addListener((msg) => {
     onTabChanged(msg.tabId);
     return;
   }
-  if (msg.type === 'GET_GEMINI_TAB_ID') {
-    ensureGeminiTab().then((tabId) => {
-      browser.runtime.sendMessage({ type: 'GEMINI_TAB_ID', tabId }).catch(() => {});
-    });
-    return;
-  }
   if (msg.type === 'ATTACH_FILE') {
-    if (geminiTabId === null) return;
-    const file = new File([msg.markdown], msg.filename, { type: 'text/markdown' });
-    browser.tabs.sendMessage(geminiTabId, { type: 'ATTACH_FILE', file }).catch(() => {});
+    const iframe = document.getElementById('gemini');
+    if (iframe?.contentWindow) {
+      const file = new File([msg.markdown], msg.filename, { type: 'text/markdown' });
+      iframe.contentWindow.postMessage(
+        { type: 'ATTACH_FILE', file: file },
+        '*'
+      );
+    }
   }
 });
