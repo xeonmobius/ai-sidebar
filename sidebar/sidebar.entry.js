@@ -15,6 +15,9 @@ if (isFirefox) {
   iframe.hidden = true;
   firefoxNotice.hidden = false;
   openGeminiBtn.hidden = false;
+} else {
+  // Chrome: load Gemini in the iframe (DNR strips X-Frame-Options)
+  iframe.src = 'https://gemini.google.com/app';
 }
 
 let status = INITIAL_STATUS;
