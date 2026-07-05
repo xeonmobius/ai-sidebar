@@ -14,6 +14,10 @@ const SELECTORS = {
 
 const ATTACH_TIMEOUT_MS = 8000;
 
+async function waitForGeminiReady() {
+  await waitForSelector(SELECTORS.fileInput, { timeout: ATTACH_TIMEOUT_MS });
+}
+
 async function tryAttach(file) {
   const input = await waitForSelector(SELECTORS.fileInput, { timeout: ATTACH_TIMEOUT_MS });
   attachFileToInput(input, file);
@@ -67,6 +71,21 @@ browser.runtime.onMessage.addListener((msg) => {
 window.addEventListener('message', (event) => {
   if (event.data?.type === 'GET_URL') {
     window.postMessage({ type: 'CURRENT_URL', url: location.href }, '*');
+  }
+  if (event.data?.type === 'CLICK_TEMP_CHAT') {
+    const buttons = document.querySelectorAll('button, [role="button"]');
+    for (const btn of buttons) {
+      const text = btn.textContent?.toLowerCase() || '';
+      if (text.includes('new chat') || text.includes('temporary') || text.includes('start')) {
+        btn.click();
+        break;
+      }
+    }
+  }
+  if (event.data?.type === 'ATTACH_FILE' && event.data.file) {
+    waitForGeminiReady().then(() => {
+      handleAttach(event.data);
+    });
   }
 });
 

@@ -13,14 +13,18 @@ async function getCurrentGeminiUrl() {
   const iframe = document.getElementById('gemini');
   if (!iframe?.contentWindow) return GEMINI_BASE;
   return new Promise((resolve) => {
-    const timer = setTimeout(() => resolve(GEMINI_BASE), 1000);
-    window.addEventListener('message', function handler(event) {
+    const timer = setTimeout(() => {
+      window.removeEventListener('message', handler);
+      resolve(GEMINI_BASE);
+    }, 1000);
+    function handler(event) {
       if (event.data?.type === 'CURRENT_URL') {
         clearTimeout(timer);
         window.removeEventListener('message', handler);
         resolve(event.data.url);
       }
-    });
+    }
+    window.addEventListener('message', handler);
     iframe.contentWindow.postMessage({ type: 'GET_URL' }, '*');
   });
 }
@@ -93,8 +97,9 @@ browser.runtime.onMessage.addListener((msg) => {
   if (msg.type === 'ATTACH_FILE') {
     const iframe = document.getElementById('gemini');
     if (iframe?.contentWindow) {
+      const file = new File([msg.markdown], msg.filename, { type: 'text/markdown' });
       iframe.contentWindow.postMessage(
-        { type: 'ATTACH_FILE', markdown: msg.markdown, filename: msg.filename },
+        { type: 'ATTACH_FILE', file: file },
         '*'
       );
     }
