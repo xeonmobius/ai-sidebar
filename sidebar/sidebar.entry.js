@@ -61,7 +61,6 @@ async function onSidebarLoad() {
 
 async function onTabChanged(newTabId) {
   const prefs = await getPrefs();
-  const iframe = document.getElementById('gemini');
 
   if (!prefs.tempChat && currentTabId !== null) {
     const url = await getCurrentGeminiUrl();
