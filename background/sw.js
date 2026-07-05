@@ -4,6 +4,25 @@ import { slug } from '../src/utils/slug.js';
 const EXTRACT_TIMEOUT_MS = 10000;
 let activeSession = null;
 
+// Firefox MV3: strip framing headers via webRequest (DNR unreliable for X-Frame-Options on Firefox).
+// Chrome MV3 uses declarativeNetRequest static rules instead (see rules/remove_headers.json).
+const STRIP_HEADERS = new Set([
+  'x-frame-options', 'frame-options',
+  'content-security-policy', 'content-security-policy-report-only',
+]);
+if (browser.webRequest && browser.webRequest.onHeadersReceived) {
+  browser.webRequest.onHeadersReceived.addListener(
+    (details) => {
+      const responseHeaders = (details.responseHeaders || []).filter(
+        (h) => !STRIP_HEADERS.has(h.name.toLowerCase()),
+      );
+      return { responseHeaders };
+    },
+    { urls: ['*://gemini.google.com/*'] },
+    ['blocking', 'responseHeaders'],
+  );
+}
+
 async function openSidebar(tabId) {
   if (browser.sidePanel && browser.sidePanel.open) {
     const tab = await browser.tabs.get(tabId);
