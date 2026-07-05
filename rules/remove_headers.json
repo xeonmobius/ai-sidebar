@@ -7,13 +7,12 @@
       "responseHeaders": [
         { "header": "X-Frame-Options", "operation": "remove" },
         { "header": "Content-Security-Policy", "operation": "remove" },
-        { "header": "Content-Security-Policy-Report-Only", "operation": "remove" },
-        { "header": "X-Content-Type-Options", "operation": "remove" }
+        { "header": "Content-Security-Policy-Report-Only", "operation": "remove" }
       ]
     },
     "condition": {
-      "regexFilter": "^https?://(www\\.)?gemini\\.google\\.com/",
-      "resourceTypes": ["main_frame", "sub_frame"]
+      "urlFilter": "https://gemini.google.com/*",
+      "resourceTypes": ["sub_frame"]
     }
   }
 ]

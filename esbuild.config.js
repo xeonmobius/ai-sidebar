@@ -24,14 +24,12 @@ const chromeManifest = JSON.parse(readFileSync('manifest.json', 'utf8'));
 
 const firefoxManifest = JSON.parse(readFileSync('manifest.json', 'utf8'));
 delete firefoxManifest.background.service_worker;
-delete firefoxManifest.background.type;   // "module" is Chrome service_worker only — breaks Firefox scripts
+delete firefoxManifest.background.type;
 firefoxManifest.background.scripts = ['background/sw.js'];
 firefoxManifest.permissions = firefoxManifest.permissions
-  .filter((p) => p !== 'sidePanel')
-  .filter((p) => p !== 'declarativeNetRequest');
-firefoxManifest.permissions.push('webRequest', 'webRequestBlocking');
+  .filter((p) => p !== 'sidePanel');
 delete firefoxManifest.side_panel;
-delete firefoxManifest.declarativeNetRequest;
+// Keep declarativeNetRequest for Firefox (strips X-Frame-Options + CSP on sub_frame)
 // Keep sidebar_action (Firefox-native) and browser_specific_settings
 
 function buildFor(target, manifest) {
