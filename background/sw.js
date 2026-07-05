@@ -13,12 +13,17 @@ const STRIP_HEADERS = new Set([
   'content-security-policy', 'content-security-policy-report-only',
 ]);
 const native = globalThis.browser || globalThis.chrome;
+console.log('[gemini-sidebar] bg loading. native webRequest?', !!(native && native.webRequest));
 if (native && native.webRequest && native.webRequest.onHeadersReceived) {
   native.webRequest.onHeadersReceived.addListener(
     (details) => {
+      console.log('[gemini-sidebar] onHeadersReceived for', details.url);
+      const before = (details.responseHeaders || []).map((h) => h.name);
       const responseHeaders = (details.responseHeaders || []).filter(
         (h) => !STRIP_HEADERS.has(h.name.toLowerCase()),
       );
+      const after = responseHeaders.map((h) => h.name);
+      console.log('[gemini-sidebar] headers before:', before, 'after:', after);
       return { responseHeaders };
     },
     { urls: ['*://gemini.google.com/*'] },

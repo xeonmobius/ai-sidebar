@@ -24,6 +24,7 @@ const chromeManifest = JSON.parse(readFileSync('manifest.json', 'utf8'));
 
 const firefoxManifest = JSON.parse(readFileSync('manifest.json', 'utf8'));
 delete firefoxManifest.background.service_worker;
+delete firefoxManifest.background.type;   // "module" is Chrome service_worker only — breaks Firefox scripts
 firefoxManifest.background.scripts = ['background/sw.js'];
 firefoxManifest.permissions = firefoxManifest.permissions
   .filter((p) => p !== 'sidePanel')
