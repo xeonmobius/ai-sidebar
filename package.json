@@ -5,11 +5,11 @@
   "type": "module",
   "description": "Open Gemini webchat in the sidebar; attach current page or PDF as context.",
   "scripts": {
-    "test": "vitest run --passWithNoTests",
+    "test": "bunx vitest run --passWithNoTests",
     "test:watch": "vitest",
     "lint": "eslint .",
     "build": "node esbuild.config.js",
-    "lint:ext": "web-ext lint --source-dir dist"
+    "lint:ext": "bunx web-ext lint --source-dir dist"
   },
   "dependencies": {
     "turndown": "^7.2.0",
