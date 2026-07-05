@@ -17,13 +17,24 @@ async function injectIntoIframe() {
     const tabId = tabs[0].id;
 
     const frames = await browser.webNavigation.getAllFrames({ tabId });
+    console.log('[gemini-sidebar] found frames:', frames.map(f => f.url));
+
     const geminiFrame = frames.find(f => f.url.includes('gemini.google.com'));
     if (!geminiFrame) {
-      console.log('[gemini-sidebar] no gemini frame found');
+      console.log('[gemini-sidebar] no gemini frame, trying all frames...');
+      for (const frame of frames) {
+        if (frame.parentFrameId !== -1) {
+          console.log('[gemini-sidebar] injecting into child frame:', frame.url);
+          await browser.scripting.executeScript({
+            target: { tabId, frameId: frame.frameId },
+            files: ['content/gemini-injector.bundle.js'],
+          }).catch(e => console.log('[gemini-sidebar] inject failed for frame:', e.message));
+        }
+      }
       return;
     }
 
-    console.log('[gemini-sidebar] injecting into frame:', geminiFrame.url);
+    console.log('[gemini-sidebar] injecting into gemini frame:', geminiFrame.url);
     await browser.scripting.executeScript({
       target: { tabId, frameId: geminiFrame.frameId },
       files: ['content/gemini-injector.bundle.js'],
