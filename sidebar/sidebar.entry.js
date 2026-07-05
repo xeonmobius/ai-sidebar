@@ -120,4 +120,14 @@ browser.runtime.onMessage.addListener((msg) => {
       );
     }
   }
+  if (msg.type === 'ATTACH_PDF') {
+    const iframe = getIframe(currentTabId);
+    if (iframe?.contentWindow) {
+      const file = new File([msg.arrayBuffer], msg.filename, { type: msg.mimeType || 'application/pdf' });
+      iframe.contentWindow.postMessage(
+        { type: 'ATTACH_FILE', file: file },
+        '*'
+      );
+    }
+  }
 });

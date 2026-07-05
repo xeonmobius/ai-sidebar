@@ -11,11 +11,17 @@ async function runExtraction(tabId) {
   });
 }
 
-async function sendToSidebar(markdown, filename) {
-  browser.runtime
-    .sendMessage({ type: 'ATTACH_FILE', markdown, filename })
-    .catch(() => {})
-    .finally(() => { activeSession = null; });
+function isPdfUrl(url) {
+  if (!url) return false;
+  const clean = url.split('?')[0].split('#')[0].toLowerCase();
+  return clean.endsWith('.pdf') || clean.includes('.pdf');
+}
+
+async function fetchPdf(url) {
+  const response = await fetch(url);
+  const blob = await response.blob();
+  const filename = decodeURIComponent(url.split('/').pop().split('?')[0]) || 'document.pdf';
+  return { blob, filename };
 }
 
 async function triggerUpload() {
@@ -25,16 +31,33 @@ async function triggerUpload() {
   if (!sourceTab) return;
 
   activeSession = { tabId: sourceTab.id };
-
   const url = sourceTab.url || '';
-  const isPdf = sourceTab.isArticle === false && /\.(pdf)$/i.test(url);
+
+  if (isPdfUrl(url) || url.startsWith('file://')) {
+    try {
+      const { blob, filename } = await fetchPdf(url);
+      const arrayBuffer = await blob.arrayBuffer();
+      browser.runtime
+        .sendMessage({
+          type: 'ATTACH_PDF',
+          arrayBuffer,
+          filename,
+          mimeType: blob.type || 'application/pdf',
+        })
+        .catch(() => {})
+        .finally(() => { activeSession = null; });
+    } catch (err) {
+      activeSession = null;
+      console.error('[gemini-sidebar] PDF fetch failed:', err);
+    }
+    return;
+  }
 
   try {
     await runExtraction(sourceTab.id);
   } catch (err) {
     activeSession = null;
-    if (url.startsWith('file://') || url.startsWith('resource://') || url.startsWith('about:')) {
-      console.log('[gemini-sidebar] cannot extract restricted URL, skipping:', url);
+    if (url.startsWith('resource://') || url.startsWith('about:')) {
       return;
     }
     console.error('[gemini-sidebar] extraction failed:', err);
@@ -57,7 +80,10 @@ browser.runtime.onMessage.addListener((msg) => {
     const markdown = msg.result?.markdown || '';
     const filename = `${slug(title)}.md`;
 
-    sendToSidebar(markdown, filename);
+    browser.runtime
+      .sendMessage({ type: 'ATTACH_FILE', markdown, filename })
+      .catch(() => {})
+      .finally(() => { activeSession = null; });
     return;
   }
 });
