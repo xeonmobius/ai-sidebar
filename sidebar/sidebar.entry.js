@@ -37,7 +37,11 @@ async function getCurrentGeminiUrl() {
 
 async function reloadIframe(url) {
   const iframe = document.getElementById('gemini');
-  if (!iframe) return;
+  if (!iframe) {
+    console.log('[gemini-sidebar] reloadIframe: no iframe found');
+    return;
+  }
+  console.log('[gemini-sidebar] reloadIframe: setting src to', url);
   iframe.src = url;
 }
 
@@ -61,6 +65,9 @@ async function triggerUpload() {
 async function onSidebarLoad() {
   const tabs = await browser.tabs.query({ active: true, currentWindow: true });
   if (tabs.length) currentTabId = tabs[0].id;
+
+  console.log('[gemini-sidebar] sidebar loaded, waiting for injector...');
+  await new Promise((r) => setTimeout(r, 3000));
 
   const prefs = await getPrefs();
   if (prefs.tempChat) {
@@ -111,15 +118,20 @@ browser.runtime.onMessage.addListener((msg) => {
   if (msg.type === 'ATTACH_FILE') {
     console.log('[gemini-sidebar] ATTACH_FILE received:', msg.filename, msg.markdown?.length, 'chars');
     const iframe = document.getElementById('gemini');
-    if (iframe?.contentWindow) {
+    if (!iframe) {
+      console.log('[gemini-sidebar] no iframe found');
+      return;
+    }
+    console.log('[gemini-sidebar] iframe src:', iframe.src);
+    console.log('[gemini-sidebar] iframe contentWindow:', iframe.contentWindow ? 'exists' : 'null');
+    if (iframe.contentWindow) {
       const file = new File([msg.markdown], msg.filename, { type: 'text/markdown' });
       console.log('[gemini-sidebar] posting ATTACH_FILE to iframe');
       iframe.contentWindow.postMessage(
         { type: 'ATTACH_FILE', file: file },
         '*'
       );
-    } else {
-      console.log('[gemini-sidebar] no iframe to post ATTACH_FILE to');
+      console.log('[gemini-sidebar] postMessage sent');
     }
   }
 });
