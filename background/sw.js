@@ -4,31 +4,37 @@ import { slug } from '../src/utils/slug.js';
 const EXTRACT_TIMEOUT_MS = 10000;
 let activeSession = null;
 
-// Firefox MV3: strip framing headers via webRequest (DNR unreliable for X-Frame-Options on Firefox).
-// Chrome MV3 uses declarativeNetRequest static rules instead (see rules/remove_headers.json).
-// IMPORTANT: bypass the polyfill here — it wraps event listeners and drops the synchronous
-// blocking return value that webRequest needs.
+const isFirefox = typeof browser.runtime.getBrowserInfo === 'function';
+
+// Firefox: strip framing headers via webRequest (best-effort — Firefox may still
+// enforce X-Frame-Options at a deeper layer, so we also use a tab fallback).
+// Chrome: declarativeNetRequest static rules handle this (see rules/remove_headers.json).
 const STRIP_HEADERS = new Set([
   'x-frame-options', 'frame-options',
   'content-security-policy', 'content-security-policy-report-only',
 ]);
 const native = globalThis.browser || globalThis.chrome;
-console.log('[gemini-sidebar] bg loading. native webRequest?', !!(native && native.webRequest));
 if (native && native.webRequest && native.webRequest.onHeadersReceived) {
   native.webRequest.onHeadersReceived.addListener(
     (details) => {
-      console.log('[gemini-sidebar] onHeadersReceived for', details.url);
-      const before = (details.responseHeaders || []).map((h) => h.name);
       const responseHeaders = (details.responseHeaders || []).filter(
         (h) => !STRIP_HEADERS.has(h.name.toLowerCase()),
       );
-      const after = responseHeaders.map((h) => h.name);
-      console.log('[gemini-sidebar] headers before:', before, 'after:', after);
       return { responseHeaders };
     },
     { urls: ['*://gemini.google.com/*'] },
     ['blocking', 'responseHeaders'],
   );
+}
+
+async function openOrFocusGeminiTab() {
+  const tabs = await browser.tabs.query({ url: 'https://gemini.google.com/*' });
+  if (tabs.length > 0) {
+    await browser.tabs.update(tabs[0].id, { active: true });
+    return tabs[0].id;
+  }
+  const tab = await browser.tabs.create({ url: 'https://gemini.google.com/app', active: true });
+  return tab.id;
 }
 
 async function openSidebar(tabId) {
@@ -37,8 +43,6 @@ async function openSidebar(tabId) {
     await browser.sidePanel.open({ tabId, windowId: tab.windowId });
   } else if (browser.sidebarAction && browser.sidebarAction.open) {
     await browser.sidebarAction.open();
-  } else {
-    throw new Error('No sidebar API available');
   }
 }
 
@@ -54,7 +58,6 @@ async function runExtraction(tabId) {
 }
 
 let injectorReadyResolver = null;
-
 function waitForInjectorReady(timeout) {
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => reject(new Error('injector not ready')), timeout);
@@ -66,7 +69,14 @@ async function onActionClicked(tab) {
   if (activeSession) return;
   activeSession = { tabId: tab.id };
   try {
-    await openSidebar(tab.id);
+    if (isFirefox) {
+      // Firefox: open/focus Gemini tab + sidebar as control panel
+      await openOrFocusGeminiTab();
+      await openSidebar(tab.id);
+    } else {
+      // Chrome: sidePanel has the iframe
+      await openSidebar(tab.id);
+    }
     await waitForInjectorReady(EXTRACT_TIMEOUT_MS);
     await runExtraction(tab.id);
   } catch (err) {
@@ -77,6 +87,9 @@ async function onActionClicked(tab) {
 
 browser.runtime.onMessage.addListener(async (msg, _sender) => {
   switch (msg.type) {
+    case 'OPEN_GEMINI_TAB':
+      await openOrFocusGeminiTab();
+      return;
     case 'INJECTOR_READY':
       if (injectorReadyResolver) injectorReadyResolver();
       return;

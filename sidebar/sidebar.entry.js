@@ -4,6 +4,18 @@ import { statusReducer, INITIAL_STATUS } from '../src/status/reducer.js';
 const statusEl = document.getElementById('status');
 const pdfInput = document.getElementById('pdf-input');
 const attachPdfBtn = document.getElementById('attach-pdf');
+const openGeminiBtn = document.getElementById('open-gemini');
+const iframe = document.getElementById('gemini');
+const firefoxNotice = document.getElementById('firefox-notice');
+
+// Firefox blocks X-Frame-Options at a layer below all extension APIs.
+// Hide the iframe, show the notice + "open Gemini tab" button.
+const isFirefox = typeof browser.runtime.getBrowserInfo === 'function';
+if (isFirefox) {
+  iframe.hidden = true;
+  firefoxNotice.hidden = false;
+  openGeminiBtn.hidden = false;
+}
 
 let status = INITIAL_STATUS;
 
@@ -35,6 +47,9 @@ pdfInput.addEventListener('change', () => {
   if (!file) return;
   setStatus({ type: 'START_EXTRACT' });
   browser.runtime.sendMessage({ type: 'ATTACH_FILE', file }).catch(() => {});
+});
+openGeminiBtn.addEventListener('click', () => {
+  browser.runtime.sendMessage({ type: 'OPEN_GEMINI_TAB' }).catch(() => {});
 });
 
 browser.runtime.onMessage.addListener((msg) => {

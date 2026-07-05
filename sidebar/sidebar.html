@@ -9,8 +9,13 @@
   <div class="toolbar">
     <button id="attach-pdf" type="button">+ Attach PDF</button>
     <input id="pdf-input" type="file" accept=".pdf,application/pdf" hidden />
+    <button id="open-gemini" type="button" hidden>Open Gemini tab →</button>
   </div>
   <iframe id="gemini" src="https://gemini.google.com/app"></iframe>
+  <div id="firefox-notice" class="notice" hidden>
+    <p>Firefox doesn't allow embedding Gemini in the sidebar.</p>
+    <p>Click the toolbar icon — Gemini opens in a tab and the page is attached automatically.</p>
+  </div>
   <script src="sidebar.bundle.js"></script>
 </body>
 </html>

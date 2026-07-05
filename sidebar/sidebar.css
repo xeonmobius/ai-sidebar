@@ -3,6 +3,7 @@ html, body { margin: 0; height: 100vh; display: flex; flex-direction: column; fo
 .status.busy { background: #fff3cd; }
 .status.ok { background: #d4edda; }
 .status.error { background: #f8d7da; }
-.toolbar { padding: 4px 8px; border-bottom: 1px solid #ddd; }
-#attach-pdf { font: inherit; padding: 2px 8px; cursor: pointer; }
+.toolbar { padding: 4px 8px; border-bottom: 1px solid #ddd; display: flex; gap: 4px; }
+#attach-pdf, #open-gemini { font: inherit; padding: 2px 8px; cursor: pointer; }
 iframe#gemini { flex: 1; border: none; }
+.notice { padding: 12px 8px; color: #555; line-height: 1.5; }
