@@ -3,7 +3,7 @@ import browser from 'webextension-polyfill';
 const GEMINI_BASE = 'https://gemini.google.com/app';
 const tabUrls = new Map();
 let currentTabId = null;
-let injectorReady = false;
+let lastUploadTab = null;
 
 async function getPrefs() {
   const result = await browser.storage.local.get('prefs');
@@ -11,28 +11,32 @@ async function getPrefs() {
 }
 
 async function injectIntoIframe() {
-  const iframe = document.getElementById('gemini');
-  if (!iframe?.contentWindow) return false;
-
   try {
     const tabs = await browser.tabs.query({ active: true, currentWindow: true });
-    if (!tabs.length) return false;
+    if (!tabs.length) return;
     const tabId = tabs[0].id;
 
     const frames = await browser.webNavigation.getAllFrames({ tabId });
     const geminiFrame = frames.find(f => f.url.includes('gemini.google.com'));
-    if (!geminiFrame) return false;
+    if (!geminiFrame) return;
 
     await browser.scripting.executeScript({
       target: { tabId, frameId: geminiFrame.frameId },
       files: ['content/gemini-injector.bundle.js'],
     });
-    injectorReady = true;
-    return true;
   } catch (e) {
-    console.log('[gemini-sidebar] injectIntoIframe failed:', e.message);
-    return false;
+    console.log('[gemini-sidebar] inject failed:', e.message);
   }
+}
+
+function setupIframeObserver() {
+  const iframe = document.getElementById('gemini');
+  if (!iframe) return;
+
+  iframe.addEventListener('load', async () => {
+    await new Promise((r) => setTimeout(r, 1000));
+    await injectIntoIframe();
+  });
 }
 
 async function getCurrentGeminiUrl() {
@@ -55,32 +59,34 @@ async function getCurrentGeminiUrl() {
   });
 }
 
-async function reloadIframe(url) {
-  const iframe = document.getElementById('gemini');
-  if (!iframe) return;
-  injectorReady = false;
-  iframe.src = url;
-}
+async function triggerUpload() {
+  const tabs = await browser.tabs.query({ active: true, currentWindow: true });
+  if (!tabs.length) return;
+  const tabId = tabs[0].id;
 
-async function waitForInjector() {
-  for (let i = 0; i < 20; i++) {
-    if (injectorReady) return true;
-    await new Promise((r) => setTimeout(r, 500));
+  if (lastUploadTab === tabId) return;
+  lastUploadTab = tabId;
+
+  await new Promise((r) => setTimeout(r, 500));
+  try {
+    await browser.runtime.sendMessage({ type: 'TRIGGER_UPLOAD' });
+  } catch {
+    await new Promise((r) => setTimeout(r, 2000));
+    await browser.runtime.sendMessage({ type: 'TRIGGER_UPLOAD' }).catch(() => {});
   }
-  return false;
 }
 
 async function onSidebarLoad() {
   const tabs = await browser.tabs.query({ active: true, currentWindow: true });
   if (tabs.length) currentTabId = tabs[0].id;
 
+  setupIframeObserver();
   await new Promise((r) => setTimeout(r, 3000));
   await injectIntoIframe();
-  await waitForInjector();
+  await new Promise((r) => setTimeout(r, 1000));
 
   const prefs = await getPrefs();
   if (prefs.tempChat) {
-    await new Promise((r) => setTimeout(r, 1000));
     const iframe = document.getElementById('gemini');
     if (iframe?.contentWindow) {
       iframe.contentWindow.postMessage({ type: 'CLICK_TEMP_CHAT' }, '*');
@@ -99,35 +105,28 @@ async function onTabChanged(newTabId) {
   }
 
   currentTabId = newTabId;
+  lastUploadTab = null;
 
   let targetUrl = GEMINI_BASE;
   if (!prefs.tempChat && tabUrls.has(newTabId)) {
     targetUrl = tabUrls.get(newTabId);
   }
 
-  await reloadIframe(targetUrl);
+  const iframe = document.getElementById('gemini');
+  if (iframe) {
+    iframe.src = targetUrl;
+  }
   await new Promise((r) => setTimeout(r, 3000));
   await injectIntoIframe();
-  await waitForInjector();
+  await new Promise((r) => setTimeout(r, 1000));
 
   if (prefs.tempChat) {
-    await new Promise((r) => setTimeout(r, 1000));
     const iframe = document.getElementById('gemini');
     if (iframe?.contentWindow) {
       iframe.contentWindow.postMessage({ type: 'CLICK_TEMP_CHAT' }, '*');
     }
   }
   await triggerUpload();
-}
-
-async function triggerUpload() {
-  await new Promise((r) => setTimeout(r, 500));
-  try {
-    await browser.runtime.sendMessage({ type: 'TRIGGER_UPLOAD' });
-  } catch {
-    await new Promise((r) => setTimeout(r, 2000));
-    await browser.runtime.sendMessage({ type: 'TRIGGER_UPLOAD' }).catch(() => {});
-  }
 }
 
 onSidebarLoad();
