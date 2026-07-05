@@ -6,12 +6,15 @@ let activeSession = null;
 
 // Firefox MV3: strip framing headers via webRequest (DNR unreliable for X-Frame-Options on Firefox).
 // Chrome MV3 uses declarativeNetRequest static rules instead (see rules/remove_headers.json).
+// IMPORTANT: bypass the polyfill here — it wraps event listeners and drops the synchronous
+// blocking return value that webRequest needs.
 const STRIP_HEADERS = new Set([
   'x-frame-options', 'frame-options',
   'content-security-policy', 'content-security-policy-report-only',
 ]);
-if (browser.webRequest && browser.webRequest.onHeadersReceived) {
-  browser.webRequest.onHeadersReceived.addListener(
+const native = globalThis.browser || globalThis.chrome;
+if (native && native.webRequest && native.webRequest.onHeadersReceived) {
+  native.webRequest.onHeadersReceived.addListener(
     (details) => {
       const responseHeaders = (details.responseHeaders || []).filter(
         (h) => !STRIP_HEADERS.has(h.name.toLowerCase()),
