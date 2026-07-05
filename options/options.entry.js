@@ -1,6 +1,6 @@
 import browser from 'webextension-polyfill';
 
-const DEFAULTS = { autoAttach: true, maxChars: 500000, preferFileType: 'md', tempChat: true };
+const DEFAULTS = { autoAttach: true, maxChars: 500000, preferFileType: 'md', tempChat: false };
 
 const el = {
   auto: document.getElementById('auto-attach'),

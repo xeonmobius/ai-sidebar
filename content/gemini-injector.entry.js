@@ -14,17 +14,19 @@ const SELECTORS = {
 
 const ATTACH_TIMEOUT_MS = 8000;
 
-async function waitForGeminiReady() {
-  await waitForSelector(SELECTORS.fileInput, { timeout: ATTACH_TIMEOUT_MS });
-}
-
 async function tryAttach(file) {
   const input = await waitForSelector(SELECTORS.fileInput, { timeout: ATTACH_TIMEOUT_MS });
   attachFileToInput(input, file);
   return input;
 }
 
-async function focusPrompt() {
+async function clipboardFallback(file) {
+  try {
+    const text = await file.text();
+    await navigator.clipboard.writeText(text);
+  } catch {
+    /* clipboard may require user gesture */
+  }
   try {
     const el = await waitForSelector([SELECTORS.promptFocus], { timeout: 2000 });
     el.focus();
@@ -34,52 +36,22 @@ async function focusPrompt() {
   }
 }
 
-async function clipboardFallback(file) {
-  try {
-    const text = await file.text();
-    await navigator.clipboard.writeText(text);
-  } catch {
-    /* clipboard may require user gesture; status will guide user */
-  }
-  await focusPrompt();
-}
-
-function ack(ok, message) {
-  browser.runtime.sendMessage({ type: 'ATTACH_ACK', ok, message }).catch(() => {});
-}
-
 async function handleAttach(msg) {
   const file = msg.file;
   try {
     await tryAttach(file);
-    ack(true);
   } catch {
     try {
       await tryAttach(buildTxtRetryFile(file));
-      ack(true);
     } catch (e) {
       await clipboardFallback(file);
-      ack(false, e.message);
     }
   }
 }
 
-browser.runtime.onMessage.addListener((msg) => {
-  if (msg.type === 'ATTACH_FILE') return handleAttach(msg);
-});
-
-function getUrl() {
-  const url = location.href;
-  const hash = location.hash;
-  console.log('[gemini-injector] getUrl() called, href:', url, 'hash:', hash);
-  return hash ? url.split('#')[0] + hash : url;
-}
-
 window.addEventListener('message', (event) => {
   if (event.data?.type === 'GET_URL') {
-    const url = getUrl();
-    console.log('[gemini-injector] GET_URL received, returning:', url);
-    window.parent.postMessage({ type: 'CURRENT_URL', url: url }, '*');
+    window.parent.postMessage({ type: 'CURRENT_URL', url: location.href }, '*');
   }
   if (event.data?.type === 'CLICK_TEMP_CHAT') {
     const buttons = document.querySelectorAll('button, [role="button"]');
@@ -92,22 +64,8 @@ window.addEventListener('message', (event) => {
     }
   }
   if (event.data?.type === 'ATTACH_FILE' && event.data.file) {
-    console.log('[gemini-injector] ATTACH_FILE received via postMessage:', event.data.file.name);
-    waitForGeminiReady().then(() => {
-      console.log('[gemini-injector] Gemini ready, handling attach');
+    waitForSelector(SELECTORS.fileInput, { timeout: ATTACH_TIMEOUT_MS }).then(() => {
       handleAttach(event.data);
-    }).catch((e) => {
-      console.log('[gemini-injector] Gemini not ready:', e.message);
-    });
+    }).catch(() => {});
   }
 });
-
-browser.runtime.sendMessage({ type: 'INJECTOR_READY' }).catch(() => {});
-
-let lastUrl = location.href;
-setInterval(() => {
-  if (location.href !== lastUrl) {
-    console.log('[gemini-injector] URL changed:', lastUrl, '->', location.href);
-    lastUrl = location.href;
-  }
-}, 1000);

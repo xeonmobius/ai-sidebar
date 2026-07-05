@@ -4,6 +4,7 @@ import { cpSync, mkdirSync, rmSync, readFileSync, writeFileSync, existsSync } fr
 const ENTRY_POINTS = [
   { in: 'background/sw.js', out: 'background/sw.js' },
   { in: 'content/extractor.entry.js', out: 'content/extractor.bundle.js' },
+  { in: 'content/gemini-main.entry.js', out: 'content/gemini-main.bundle.js' },
   { in: 'content/gemini-injector.entry.js', out: 'content/gemini-injector.bundle.js' },
   { in: 'sidebar/sidebar.entry.js', out: 'sidebar/sidebar.bundle.js' },
   { in: 'options/options.entry.js', out: 'options/options.bundle.js' },
