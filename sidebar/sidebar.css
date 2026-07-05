@@ -1,0 +1,8 @@
+html, body { margin: 0; height: 100vh; display: flex; flex-direction: column; font: 12px system-ui, sans-serif; }
+.status { padding: 4px 8px; background: #eee; }
+.status.busy { background: #fff3cd; }
+.status.ok { background: #d4edda; }
+.status.error { background: #f8d7da; }
+.toolbar { padding: 4px 8px; border-bottom: 1px solid #ddd; }
+#attach-pdf { font: inherit; padding: 2px 8px; cursor: pointer; }
+iframe#gemini { flex: 1; border: none; }

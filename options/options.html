@@ -1,0 +1,15 @@
+<!doctype html>
+<html>
+<head><meta charset="utf-8" /><title>Gemini Sidebar Options</title></head>
+<body style="font: 14px system-ui; padding: 16px">
+  <h2>Gemini Sidebar Options</h2>
+  <label><input type="checkbox" id="auto-attach" /> Auto-attach on sidebar open</label><br /><br />
+  <label>Max chars: <input type="number" id="max-chars" min="1000" step="1000" /></label><br /><br />
+  <label>Preferred file type:
+    <select id="file-type"><option value="md">.md</option><option value="txt">.txt</option></select>
+  </label><br /><br />
+  <button id="save">Save</button>
+  <div id="saved" style="color:green"></div>
+  <script src="options.bundle.js"></script>
+</body>
+</html>

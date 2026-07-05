@@ -1,0 +1,27 @@
+{
+  "name": "gemini-sidebar",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Open Gemini webchat in the sidebar; attach current page or PDF as context.",
+  "scripts": {
+    "test": "vitest run --passWithNoTests",
+    "test:watch": "vitest",
+    "lint": "eslint .",
+    "build": "node esbuild.config.js",
+    "lint:ext": "web-ext lint --source-dir dist"
+  },
+  "dependencies": {
+    "turndown": "^7.2.0",
+    "turndown-plugin-gfm": "^1.0.2",
+    "webextension-polyfill": "^0.12.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.9.0",
+    "esbuild": "^0.23.0",
+    "eslint": "^9.9.0",
+    "jsdom": "^24.1.0",
+    "vitest": "^2.0.0",
+    "web-ext": "^8.2.0"
+  }
+}
