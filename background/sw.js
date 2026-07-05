@@ -1,27 +1,13 @@
 import browser from 'webextension-polyfill';
 import { slug } from '../src/utils/slug.js';
 
-const EXTRACT_TIMEOUT_MS = 20000;
 let activeSession = null;
-let injectorReady = false;
-let injectorReadyResolver = null;
 
 async function runExtraction(tabId) {
-  try {
-    await browser.scripting.executeScript({
-      target: { tabId },
-      files: ['content/extractor.bundle.js'],
-    });
-  } catch (err) {
-    console.error('[gemini-sidebar] extractor injection failed:', err);
-  }
-}
-
-function waitForInjectorReady(timeout) {
-  if (injectorReady) return Promise.resolve();
-  return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error('injector not ready')), timeout);
-    injectorReadyResolver = () => { clearTimeout(timer); resolve(); };
+  await browser.scripting.executeScript({
+    target: { tabId },
+    files: ['content/extractor.bundle.js'],
+    world: 'ISOLATED',
   });
 }
 
@@ -30,59 +16,56 @@ async function triggerUpload() {
     console.log('[gemini-sidebar] session active, skipping');
     return;
   }
-  const tabs = await browser.tabs.query({ active: true, currentWindow: true });
-  if (!tabs.length) return;
-  const tab = tabs[0];
-  activeSession = { tabId: tab.id };
-  console.log('[gemini-sidebar] triggerUpload, tab:', tab.id, 'url:', tab.url);
+
+  const [sourceTab] = await browser.tabs.query({ active: true, currentWindow: true });
+  if (!sourceTab) return;
+
+  activeSession = { tabId: sourceTab.id };
+  console.log('[gemini-sidebar] triggerUpload, source tab:', sourceTab.id);
 
   try {
-    console.log('[gemini-sidebar] waiting for injector...');
-    await waitForInjectorReady(EXTRACT_TIMEOUT_MS);
-    console.log('[gemini-sidebar] injector ready, extracting page...');
-    await runExtraction(tab.id);
+    console.log('[gemini-sidebar] extracting source page...');
+    await runExtraction(sourceTab.id);
+    console.log('[gemini-sidebar] extractor injected, waiting for EXTRACT_RESULT...');
   } catch (err) {
     activeSession = null;
-    console.error('[gemini-sidebar] upload failed:', err);
+    console.error('[gemini-sidebar] extraction failed:', err);
   }
 }
 
-browser.runtime.onMessage.addListener(async (msg, _sender) => {
-  switch (msg.type) {
-    case 'TRIGGER_UPLOAD':
-      console.log('[gemini-sidebar] TRIGGER_UPLOAD received');
-      triggerUpload();
-      return;
-    case 'INJECTOR_READY':
-      console.log('[gemini-sidebar] INJECTOR_READY received');
-      injectorReady = true;
-      if (injectorReadyResolver) injectorReadyResolver();
-      return;
-    case 'EXTRACT_RESULT': {
-      console.log('[gemini-sidebar] EXTRACT_RESULT received');
-      if (msg.error) {
-        console.error('[gemini-sidebar] extract error:', msg.error);
-        activeSession = null;
-        return;
-      }
-      const title = msg.result.title || 'page';
-      const filename = `${slug(title)}.md`;
-      const file = new File([msg.result.markdown], filename, { type: 'text/markdown' });
-      console.log('[gemini-sidebar] sending ATTACH_FILE:', filename, msg.result.markdown.length, 'chars');
-      try {
-        await browser.runtime.sendMessage({ type: 'ATTACH_FILE', file });
-      } catch {
-        console.warn('[gemini-sidebar] no injector listening for ATTACH_FILE');
-      }
-      return;
-    }
-    case 'ATTACH_ACK':
-      console.log('[gemini-sidebar] ATTACH_ACK, ok:', msg.ok);
+browser.runtime.onMessage.addListener((msg) => {
+  if (msg.type === 'TRIGGER_UPLOAD') {
+    console.log('[gemini-sidebar] TRIGGER_UPLOAD received');
+    triggerUpload();
+    return;
+  }
+
+  if (msg.type === 'EXTRACT_RESULT') {
+    console.log('[gemini-sidebar] EXTRACT_RESULT received');
+    if (msg.error) {
+      console.error('[gemini-sidebar] extract error:', msg.error);
       activeSession = null;
       return;
+    }
+
+    const title = msg.result?.title || 'page';
+    const markdown = msg.result?.markdown || '';
+    const filename = `${slug(title)}.md`;
+    console.log('[gemini-sidebar] sending to sidebar:', filename, markdown.length, 'chars');
+
+    browser.runtime
+      .sendMessage({ type: 'ATTACH_FILE', markdown, filename })
+      .then(() => console.log('[gemini-sidebar] sidebar acknowledged ATTACH_FILE'))
+      .catch((e) => console.warn('[gemini-sidebar] sidebar not listening:', e))
+      .finally(() => { activeSession = null; });
+    return;
   }
 });
 
-browser.action.onClicked.addListener((_tab) => {
+browser.action.onClicked.addListener(() => {
   triggerUpload();
+});
+
+browser.tabs.onActivated.addListener((activeInfo) => {
+  browser.runtime.sendMessage({ type: 'TAB_CHANGED', tabId: activeInfo.tabId }).catch(() => {});
 });
