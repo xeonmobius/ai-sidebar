@@ -29,7 +29,9 @@ firefoxManifest.background.scripts = ['background/sw.js'];
 firefoxManifest.permissions = firefoxManifest.permissions
   .filter((p) => p !== 'sidePanel');
 delete firefoxManifest.side_panel;
-// Keep declarativeNetRequest for Firefox (strips X-Frame-Options + CSP on sub_frame)
+// Firefox uses snake_case manifest key for DNR
+delete firefoxManifest.declarativeNetRequest;
+firefoxManifest.declarative_net_request = chromeManifest.declarativeNetRequest;
 // Keep sidebar_action (Firefox-native) and browser_specific_settings
 
 function buildFor(target, manifest) {
