@@ -68,10 +68,18 @@ browser.runtime.onMessage.addListener((msg) => {
   if (msg.type === 'ATTACH_FILE') return handleAttach(msg);
 });
 
+function getUrl() {
+  const url = location.href;
+  const hash = location.hash;
+  console.log('[gemini-injector] getUrl() called, href:', url, 'hash:', hash);
+  return hash ? url.split('#')[0] + hash : url;
+}
+
 window.addEventListener('message', (event) => {
   if (event.data?.type === 'GET_URL') {
-    console.log('[gemini-injector] GET_URL received, responding with:', location.href);
-    window.parent.postMessage({ type: 'CURRENT_URL', url: location.href }, '*');
+    const url = getUrl();
+    console.log('[gemini-injector] GET_URL received, returning:', url);
+    window.parent.postMessage({ type: 'CURRENT_URL', url: url }, '*');
   }
   if (event.data?.type === 'CLICK_TEMP_CHAT') {
     const buttons = document.querySelectorAll('button, [role="button"]');
@@ -95,3 +103,11 @@ window.addEventListener('message', (event) => {
 });
 
 browser.runtime.sendMessage({ type: 'INJECTOR_READY' }).catch(() => {});
+
+let lastUrl = location.href;
+setInterval(() => {
+  if (location.href !== lastUrl) {
+    console.log('[gemini-injector] URL changed:', lastUrl, '->', location.href);
+    lastUrl = location.href;
+  }
+}, 1000);
