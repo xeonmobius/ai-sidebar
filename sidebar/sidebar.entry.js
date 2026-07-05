@@ -101,6 +101,17 @@ async function onTabChanged(newTabId) {
 
 onSidebarLoad();
 
+document.getElementById('pdf-input')?.addEventListener('change', (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const iframe = getIframe(currentTabId);
+  if (iframe?.contentWindow) {
+    iframe.contentWindow.postMessage({ type: 'ATTACH_FILE', file }, '*');
+  }
+  const picker = document.getElementById('pdf-picker');
+  if (picker) picker.style.display = 'none';
+});
+
 browser.tabs.onRemoved.addListener((tabId) => {
   removeIframe(tabId);
 });
@@ -119,6 +130,10 @@ browser.runtime.onMessage.addListener((msg) => {
         '*'
       );
     }
+  }
+  if (msg.type === 'PDF_PICKER_NEEDED') {
+    const picker = document.getElementById('pdf-picker');
+    if (picker) picker.style.display = 'flex';
   }
   if (msg.type === 'ATTACH_PDF') {
     const iframe = getIframe(currentTabId);

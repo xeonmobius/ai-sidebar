@@ -59,7 +59,7 @@ async function triggerUpload() {
         .finally(() => { activeSession = null; });
     } catch (err) {
       activeSession = null;
-      console.error('[gemini-sidebar] PDF fetch failed:', err);
+      browser.runtime.sendMessage({ type: 'PDF_PICKER_NEEDED' }).catch(() => {});
     }
     return;
   }
