@@ -10,8 +10,7 @@
     "scripting",
     "storage",
     "clipboardWrite",
-    "clipboardRead",
-    "webNavigation"
+    "clipboardRead"
   ],
   "host_permissions": ["https://gemini.google.com/*", "<all_urls>"],
   "action": {
