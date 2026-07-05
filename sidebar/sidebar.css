@@ -1,2 +1,16 @@
 html, body { margin: 0; height: 100vh; overflow: hidden; }
-iframe#gemini { width: 100%; height: 100%; border: none; }
+#iframe-container { width: 100%; height: 100%; }
+#iframe-container iframe { width: 100%; height: 100%; border: none; }
+#disabled-panel {
+  display: none;
+  width: 100%;
+  height: 100%;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  font: 14px system-ui;
+  color: #666;
+  padding: 20px;
+  box-sizing: border-box;
+}
+#disabled-panel p { max-width: 200px; }
