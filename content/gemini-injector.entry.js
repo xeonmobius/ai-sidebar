@@ -14,11 +14,23 @@ const SELECTORS = {
 
 const ATTACH_TIMEOUT_MS = 8000;
 
-async function tryAttach(file) {
-  const input = await waitForSelector(SELECTORS.fileInput, { timeout: ATTACH_TIMEOUT_MS });
-  attachFileToInput(input, file);
-  return input;
-}
+let pendingFile = null;
+
+const _inputClick = HTMLInputElement.prototype.click;
+HTMLInputElement.prototype.click = function() {
+  if (this.type === 'file' && pendingFile) {
+    const dt = new DataTransfer();
+    dt.items.add(pendingFile);
+    this.files = dt.files;
+    const input = this;
+    setTimeout(() => {
+      input.dispatchEvent(new Event('change', { bubbles: true }));
+      pendingFile = null;
+    }, 100);
+    return;
+  }
+  return _inputClick.call(this);
+};
 
 async function clipboardFallback(file) {
   try {
@@ -36,15 +48,20 @@ async function clipboardFallback(file) {
   }
 }
 
-async function handleAttach(msg) {
-  const file = msg.file;
+async function handleAttach(file) {
+  pendingFile = file;
   try {
-    await tryAttach(file);
+    const input = await waitForSelector(SELECTORS.fileInput, { timeout: ATTACH_TIMEOUT_MS });
+    attachFileToInput(input, file);
+    pendingFile = null;
   } catch {
     try {
-      await tryAttach(buildTxtRetryFile(file));
-    } catch (e) {
+      const input = await waitForSelector(SELECTORS.fileInput, { timeout: ATTACH_TIMEOUT_MS });
+      attachFileToInput(input, buildTxtRetryFile(file));
+      pendingFile = null;
+    } catch {
       await clipboardFallback(file);
+      pendingFile = null;
     }
   }
 }
@@ -64,8 +81,6 @@ window.addEventListener('message', (event) => {
     }
   }
   if (event.data?.type === 'ATTACH_FILE' && event.data.file) {
-    waitForSelector(SELECTORS.fileInput, { timeout: ATTACH_TIMEOUT_MS }).then(() => {
-      handleAttach(event.data);
-    }).catch(() => {});
+    handleAttach(event.data.file);
   }
 });
