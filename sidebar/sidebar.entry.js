@@ -77,28 +77,6 @@ async function onSidebarLoad() {
   await triggerUpload();
 }
 
-async function onTabChanged(newTabId) {
-  if (currentTabId === newTabId) return;
-
-  showIframe(newTabId);
-
-  const isNew = !iframes.has(newTabId);
-  if (isNew) {
-    const iframe = createIframe(newTabId);
-    showIframe(newTabId);
-    await new Promise((r) => setTimeout(r, 4000));
-
-    const prefs = await getPrefs();
-    if (prefs.tempChat && iframe?.contentWindow) {
-      iframe.contentWindow.postMessage({ type: 'CLICK_TEMP_CHAT' }, '*');
-    }
-  }
-
-  currentTabId = newTabId;
-  lastUploadTab = null;
-  await triggerUpload();
-}
-
 onSidebarLoad();
 
 document.getElementById('pdf-input')?.addEventListener('change', (e) => {
@@ -116,11 +94,25 @@ browser.tabs.onRemoved.addListener((tabId) => {
   removeIframe(tabId);
 });
 
-browser.runtime.onMessage.addListener((msg) => {
-  if (msg.type === 'TAB_CHANGED') {
-    onTabChanged(msg.tabId);
-    return;
+browser.tabs.onActivated.addListener(async (activeInfo) => {
+  if (activeInfo.tabId === currentTabId) return;
+  currentTabId = activeInfo.tabId;
+  lastUploadTab = null;
+
+  if (!iframes.has(activeInfo.tabId)) {
+    createIframe(activeInfo.tabId);
+    await new Promise((r) => setTimeout(r, 4000));
+    const prefs = await getPrefs();
+    const iframe = getIframe(activeInfo.tabId);
+    if (prefs.tempChat && iframe?.contentWindow) {
+      iframe.contentWindow.postMessage({ type: 'CLICK_TEMP_CHAT' }, '*');
+    }
   }
+  showIframe(activeInfo.tabId);
+  await triggerUpload();
+});
+
+browser.runtime.onMessage.addListener((msg) => {
   if (msg.type === 'ATTACH_FILE') {
     const iframe = getIframe(currentTabId);
     if (iframe?.contentWindow) {
