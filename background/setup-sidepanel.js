@@ -19,7 +19,7 @@ export function setupSidePanel(browser, chrome, triggerUpload) {
     if (enabledTabs.has(tab.id)) {
       enabledTabs.delete(tab.id);
       persistTabs();
-      chrome.sidePanel.setOptions({ tabId: tab.id, enabled: false });
+      chrome.sidePanel.setOptions({ tabId: tab.id, path: PANEL_PATH, enabled: false });
     } else {
       enabledTabs.add(tab.id);
       persistTabs();
@@ -29,12 +29,12 @@ export function setupSidePanel(browser, chrome, triggerUpload) {
   });
 
   browser.tabs.onActivated.addListener((activeInfo) => {
-    if (enabledTabs.size === 0) return;
-    if (enabledTabs.has(activeInfo.tabId)) {
-      chrome.sidePanel.setOptions({ tabId: activeInfo.tabId, path: PANEL_PATH, enabled: true });
-    } else {
-      chrome.sidePanel.setOptions({ tabId: activeInfo.tabId, enabled: false });
-    }
+    const isEnabled = enabledTabs.has(activeInfo.tabId);
+    chrome.sidePanel.setOptions({
+      tabId: activeInfo.tabId,
+      path: PANEL_PATH,
+      enabled: isEnabled,
+    });
   });
 
   browser.tabs.onRemoved.addListener((tabId) => {

@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "AI Sidebar",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Open Gemini webchat in the sidebar. Attach the current page or a PDF as context.",
   "permissions": [
     "sidePanel",

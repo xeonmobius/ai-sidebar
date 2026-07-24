@@ -10,7 +10,6 @@ function createMockEnv() {
   const sidePanel = {
     setPanelBehavior: vi.fn(),
     setOptions: vi.fn().mockResolvedValue(undefined),
-    open: vi.fn().mockResolvedValue(undefined),
   };
 
   const browser = {
@@ -41,11 +40,10 @@ describe('setupSidePanel', () => {
     expect(env.sidePanel.setPanelBehavior).toHaveBeenCalledWith({ openPanelOnActionClick: true });
   });
 
-  it('enables tab on first click (no manual open)', () => {
+  it('enables tab on first click', () => {
     setupSidePanel(env.browser, env.chrome, env.triggerUpload);
     env.actionListeners[0]({ id: 42, windowId: 1 });
     expect(env.sidePanel.setOptions).toHaveBeenCalledWith({ tabId: 42, path: 'sidebar/sidebar.html', enabled: true });
-    expect(env.sidePanel.open).not.toHaveBeenCalled();
     expect(env.triggerUpload).toHaveBeenCalled();
   });
 
@@ -54,16 +52,14 @@ describe('setupSidePanel', () => {
     env.actionListeners[0]({ id: 42, windowId: 1 });
     env.sidePanel.setOptions.mockClear();
     env.actionListeners[0]({ id: 42, windowId: 1 });
-    expect(env.sidePanel.setOptions).toHaveBeenCalledWith({ tabId: 42, enabled: false });
+    expect(env.sidePanel.setOptions).toHaveBeenCalledWith({ tabId: 42, path: 'sidebar/sidebar.html', enabled: false });
     expect(env.triggerUpload).toHaveBeenCalledTimes(1);
   });
 
-  it('hides panel on switch to non-enabled tab', () => {
+  it('hides panel on switch to non-enabled tab (with path set)', () => {
     setupSidePanel(env.browser, env.chrome, env.triggerUpload);
-    env.actionListeners[0]({ id: 42, windowId: 1 });
-    env.sidePanel.setOptions.mockClear();
     env.tabActivatedListeners[0]({ tabId: 99 });
-    expect(env.sidePanel.setOptions).toHaveBeenCalledWith({ tabId: 99, enabled: false });
+    expect(env.sidePanel.setOptions).toHaveBeenCalledWith({ tabId: 99, path: 'sidebar/sidebar.html', enabled: false });
   });
 
   it('shows panel on switch to enabled tab', () => {
@@ -72,5 +68,11 @@ describe('setupSidePanel', () => {
     env.sidePanel.setOptions.mockClear();
     env.tabActivatedListeners[0]({ tabId: 42 });
     expect(env.sidePanel.setOptions).toHaveBeenCalledWith({ tabId: 42, path: 'sidebar/sidebar.html', enabled: true });
+  });
+
+  it('sets path even when no tabs are enabled', () => {
+    setupSidePanel(env.browser, env.chrome, env.triggerUpload);
+    env.tabActivatedListeners[0]({ tabId: 1 });
+    expect(env.sidePanel.setOptions).toHaveBeenCalledWith({ tabId: 1, path: 'sidebar/sidebar.html', enabled: false });
   });
 });
