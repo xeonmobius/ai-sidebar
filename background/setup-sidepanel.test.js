@@ -4,6 +4,8 @@ import { setupSidePanel } from './setup-sidepanel.js';
 function createMockEnv() {
   const actionListeners = [];
   const tabRemovedListeners = [];
+  const tabActivatedListeners = [];
+  const sessionStore = {};
 
   const sidePanel = {
     setPanelBehavior: vi.fn(),
@@ -15,76 +17,60 @@ function createMockEnv() {
     action: { onClicked: { addListener: (fn) => actionListeners.push(fn) } },
     tabs: {
       onRemoved: { addListener: (fn) => tabRemovedListeners.push(fn) },
-      onActivated: { addListener: () => {} },
+      onActivated: { addListener: (fn) => tabActivatedListeners.push(fn) },
+    },
+    storage: {
+      session: {
+        get: vi.fn((key) => Promise.resolve(sessionStore[key] ? { [key]: sessionStore[key] } : {})),
+        set: vi.fn((obj) => { Object.assign(sessionStore, obj); return Promise.resolve(); }),
+      },
     },
   };
 
   const triggerUpload = vi.fn();
-
   const chrome = { sidePanel };
-
-  return { chrome, browser, sidePanel, triggerUpload, actionListeners, tabRemovedListeners };
+  return { chrome, browser, sidePanel, triggerUpload, actionListeners, tabRemovedListeners, tabActivatedListeners };
 }
 
 describe('setupSidePanel', () => {
   let env;
-
   beforeEach(() => { env = createMockEnv(); });
 
-  it('disables auto-open on action click', () => {
+  it('enables openPanelOnActionClick', () => {
     setupSidePanel(env.browser, env.chrome, env.triggerUpload);
-    expect(env.sidePanel.setPanelBehavior).toHaveBeenCalledWith({ openPanelOnActionClick: false });
+    expect(env.sidePanel.setPanelBehavior).toHaveBeenCalledWith({ openPanelOnActionClick: true });
   });
 
-  it('enables and opens panel when clicking icon on disabled tab', async () => {
+  it('enables tab on first click (no manual open)', () => {
     setupSidePanel(env.browser, env.chrome, env.triggerUpload);
-    const clickHandler = env.actionListeners[0];
-    await clickHandler({ id: 42, windowId: 7 });
-
-    expect(env.sidePanel.setOptions).toHaveBeenCalledWith({ tabId: 42, enabled: true });
-    expect(env.sidePanel.open).toHaveBeenCalledWith({ windowId: 7 });
+    env.actionListeners[0]({ id: 42, windowId: 1 });
+    expect(env.sidePanel.setOptions).toHaveBeenCalledWith({ tabId: 42, path: 'sidebar/sidebar.html', enabled: true });
+    expect(env.sidePanel.open).not.toHaveBeenCalled();
     expect(env.triggerUpload).toHaveBeenCalled();
   });
 
-  it('disables panel when clicking icon on enabled tab', async () => {
+  it('disables tab on second click (toggle off)', () => {
     setupSidePanel(env.browser, env.chrome, env.triggerUpload);
-    const clickHandler = env.actionListeners[0];
-    await clickHandler({ id: 42, windowId: 7 });
+    env.actionListeners[0]({ id: 42, windowId: 1 });
     env.sidePanel.setOptions.mockClear();
-    env.sidePanel.open.mockClear();
-    await clickHandler({ id: 42, windowId: 7 });
-
+    env.actionListeners[0]({ id: 42, windowId: 1 });
     expect(env.sidePanel.setOptions).toHaveBeenCalledWith({ tabId: 42, enabled: false });
-    expect(env.sidePanel.open).not.toHaveBeenCalled();
+    expect(env.triggerUpload).toHaveBeenCalledTimes(1);
   });
 
-  it('resets setOptions on tab removal if tab was enabled', async () => {
+  it('hides panel on switch to non-enabled tab', () => {
     setupSidePanel(env.browser, env.chrome, env.triggerUpload);
-    const clickHandler = env.actionListeners[0];
-    await clickHandler({ id: 42, windowId: 7 });
+    env.actionListeners[0]({ id: 42, windowId: 1 });
     env.sidePanel.setOptions.mockClear();
-
-    const removeHandler = env.tabRemovedListeners[0];
-    await removeHandler(42);
-
-    expect(env.sidePanel.setOptions).toHaveBeenCalledWith({ tabId: 42, enabled: true });
+    env.tabActivatedListeners[0]({ tabId: 99 });
+    expect(env.sidePanel.setOptions).toHaveBeenCalledWith({ tabId: 99, enabled: false });
   });
 
-  it('does not reset setOptions on tab removal if tab was not enabled', async () => {
+  it('shows panel on switch to enabled tab', () => {
     setupSidePanel(env.browser, env.chrome, env.triggerUpload);
-    const removeHandler = env.tabRemovedListeners[0];
-    await removeHandler(99);
-    expect(env.sidePanel.setOptions).not.toHaveBeenCalled();
-  });
-
-  it('treats each tab independently', async () => {
-    setupSidePanel(env.browser, env.chrome, env.triggerUpload);
-    const clickHandler = env.actionListeners[0];
-    await clickHandler({ id: 1, windowId: 7 });
+    env.actionListeners[0]({ id: 42, windowId: 1 });
     env.sidePanel.setOptions.mockClear();
-    await clickHandler({ id: 2, windowId: 7 });
-
-    expect(env.sidePanel.setOptions).toHaveBeenCalledWith({ tabId: 2, enabled: true });
-    expect(env.sidePanel.open).toHaveBeenCalledWith({ windowId: 7 });
+    env.tabActivatedListeners[0]({ tabId: 42 });
+    expect(env.sidePanel.setOptions).toHaveBeenCalledWith({ tabId: 42, path: 'sidebar/sidebar.html', enabled: true });
   });
 });

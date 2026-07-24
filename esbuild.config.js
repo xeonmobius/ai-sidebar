@@ -14,7 +14,6 @@ const STATIC_ASSETS = [
   'sidebar/sidebar.html',
   'sidebar/sidebar.css',
   'options/options.html',
-  'rules/remove_headers.json',
 ];
 
 const ICON_SIZES = [16, 48, 128];
@@ -22,6 +21,10 @@ const ICON_SIZES = [16, 48, 128];
 rmSync('dist', { recursive: true, force: true });
 
 const chromeManifest = JSON.parse(readFileSync('manifest.json', 'utf8'));
+// Chrome doesn't recognize sidebar_action (Firefox-only key)
+delete chromeManifest.sidebar_action;
+// No side_panel.default_path — prevents Chrome from creating a global panel.
+// Path is provided per-tab via chrome.sidePanel.setOptions({ tabId, path }).
 
 const firefoxManifest = JSON.parse(readFileSync('manifest.json', 'utf8'));
 delete firefoxManifest.background.service_worker;
@@ -30,9 +33,7 @@ firefoxManifest.background.scripts = ['background/sw.js'];
 firefoxManifest.permissions = firefoxManifest.permissions
   .filter((p) => p !== 'sidePanel');
 delete firefoxManifest.side_panel;
-// Firefox uses snake_case manifest key for DNR
-delete firefoxManifest.declarativeNetRequest;
-firefoxManifest.declarative_net_request = chromeManifest.declarativeNetRequest;
+// Both Chrome and Firefox use declarative_net_request (snake_case) in manifest
 // Keep sidebar_action (Firefox-native) and browser_specific_settings
 
 function buildFor(target, manifest) {
@@ -60,6 +61,11 @@ function buildFor(target, manifest) {
       cpSync(`icons/icon-${sz}.png`, `${outDir}/icons/icon-${sz}.png`);
     }
   }
+
+  // Copy browser-specific DNR rules
+  mkdirSync(`${outDir}/rules`, { recursive: true });
+  const rulesFile = target === 'chrome' ? 'rules/remove_headers_chrome.json' : 'rules/remove_headers_firefox.json';
+  cpSync(rulesFile, `${outDir}/rules/remove_headers.json`);
 
   writeFileSync(`${outDir}/manifest.json`, JSON.stringify(manifest, null, 2) + '\n');
 }

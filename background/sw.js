@@ -76,7 +76,7 @@ async function triggerUpload() {
   activeSession = { tabId: sourceTab.id };
   const url = sourceTab.url || '';
 
-  if (url.startsWith('chrome://') || url.startsWith('about:') || url.startsWith('edge://') || url.startsWith('resource://')) {
+  if (!url || url.startsWith('chrome://') || url.startsWith('about:') || url.startsWith('edge://') || url.startsWith('resource://')) {
     activeSession = null;
     return;
   }

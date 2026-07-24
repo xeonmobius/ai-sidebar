@@ -1,25 +1,46 @@
+const PANEL_PATH = 'sidebar/sidebar.html';
+
 export function setupSidePanel(browser, chrome, triggerUpload) {
-  chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: false });
+  chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true });
 
   const enabledTabs = new Set();
 
-  browser.action.onClicked.addListener(async (tab) => {
-    const wasEnabled = enabledTabs.has(tab.id);
-    if (wasEnabled) {
+  browser.storage.session.get('enabledTabs').then((data) => {
+    if (data.enabledTabs) {
+      for (const id of data.enabledTabs) enabledTabs.add(id);
+    }
+  }).catch(() => {});
+
+  function persistTabs() {
+    browser.storage.session.set({ enabledTabs: [...enabledTabs] }).catch(() => {});
+  }
+
+  browser.action.onClicked.addListener((tab) => {
+    if (enabledTabs.has(tab.id)) {
       enabledTabs.delete(tab.id);
-      await chrome.sidePanel.setOptions({ tabId: tab.id, enabled: false });
+      persistTabs();
+      chrome.sidePanel.setOptions({ tabId: tab.id, enabled: false });
     } else {
       enabledTabs.add(tab.id);
-      await chrome.sidePanel.setOptions({ tabId: tab.id, enabled: true });
-      await chrome.sidePanel.open({ windowId: tab.windowId });
+      persistTabs();
+      chrome.sidePanel.setOptions({ tabId: tab.id, path: PANEL_PATH, enabled: true });
+      triggerUpload();
     }
-    triggerUpload();
   });
 
-  browser.tabs.onRemoved.addListener(async (tabId) => {
+  browser.tabs.onActivated.addListener((activeInfo) => {
+    if (enabledTabs.size === 0) return;
+    if (enabledTabs.has(activeInfo.tabId)) {
+      chrome.sidePanel.setOptions({ tabId: activeInfo.tabId, path: PANEL_PATH, enabled: true });
+    } else {
+      chrome.sidePanel.setOptions({ tabId: activeInfo.tabId, enabled: false });
+    }
+  });
+
+  browser.tabs.onRemoved.addListener((tabId) => {
     if (enabledTabs.has(tabId)) {
       enabledTabs.delete(tabId);
-      await chrome.sidePanel.setOptions({ tabId, enabled: true }).catch(() => {});
+      persistTabs();
     }
   });
 }

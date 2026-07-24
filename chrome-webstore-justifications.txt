@@ -1,0 +1,28 @@
+Chrome Web Store - Privacy Practices Justifications
+====================================================
+
+Single Purpose Description:
+Provides an AI assistant sidebar that opens Gemini chat and attaches the current webpage as context for AI-powered assistance.
+
+Permission Justifications:
+
+activeTab:
+Used to extract the current tab's content as Markdown when the user clicks the extension icon. Only accesses the tab that is active at the moment of the click.
+
+scripting:
+Used to inject content scripts into the active tab to extract page content, and into the Gemini iframe to enable file attachment. Scripts are only injected when triggered by the user.
+
+sidePanel:
+Used to display the Gemini chat interface in a collapsible sidebar panel.
+
+declarativeNetRequest:
+Used to strip X-Frame-Options and Content-Security-Policy headers from gemini.google.com responses so the Gemini chat can be embedded in the sidebar iframe.
+
+host_permissions:
+Required to load gemini.google.com in the sidebar iframe and to extract content from any webpage the user is viewing when they click the extension icon.
+
+storage:
+Used to save user preferences (temporary chat mode toggle) locally. No data is sent to external servers.
+
+remote code use:
+The extension loads gemini.google.com in an iframe, which is Google's own AI service. No third-party remote code is executed. The extension itself does not load any external scripts.

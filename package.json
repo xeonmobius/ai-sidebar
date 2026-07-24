@@ -1,6 +1,6 @@
 {
   "name": "gemini-sidebar",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "type": "module",
   "description": "Open Gemini webchat in the sidebar; attach current page or PDF as context.",
