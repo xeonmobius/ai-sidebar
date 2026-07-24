@@ -1,5 +1,37 @@
 import browser from 'webextension-polyfill';
 import { slug } from '../src/utils/slug.js';
+import { setupSidePanel } from './setup-sidepanel.js';
+
+// Register session DNR rules at startup (more reliable than static rules in Chrome)
+async function setupSessionRules() {
+  if (typeof chrome === 'undefined' || !chrome.declarativeNetRequest) return;
+  try {
+    await chrome.declarativeNetRequest.updateSessionRules({
+      removeRuleIds: [1],
+      addRules: [{
+        id: 1,
+        priority: 1,
+        action: {
+          type: 'modifyHeaders',
+          responseHeaders: [
+            { header: 'X-Frame-Options', operation: 'remove' },
+            { header: 'Content-Security-Policy', operation: 'remove' },
+            { header: 'Content-Security-Policy-Report-Only', operation: 'remove' },
+          ],
+        },
+        condition: {
+          urlFilter: '||gemini.google.com',
+          resourceTypes: ['sub_frame'],
+        },
+      }],
+    });
+    console.log('[gemini-sidebar] session DNR rules registered');
+  } catch (e) {
+    console.warn('[gemini-sidebar] session DNR setup failed:', e);
+  }
+}
+
+setupSessionRules();
 
 let activeSession = null;
 
@@ -43,6 +75,11 @@ async function triggerUpload() {
 
   activeSession = { tabId: sourceTab.id };
   const url = sourceTab.url || '';
+
+  if (url.startsWith('chrome://') || url.startsWith('about:') || url.startsWith('edge://') || url.startsWith('resource://')) {
+    activeSession = null;
+    return;
+  }
 
   if (isPdfUrl(url) || url.startsWith('file://')) {
     try {
@@ -99,11 +136,16 @@ browser.runtime.onMessage.addListener((msg) => {
   }
 });
 
-browser.action.onClicked.addListener(() => {
-  triggerUpload();
-});
+const hasSidePanel = typeof chrome !== 'undefined' && chrome?.sidePanel;
 
-browser.tabs.onActivated.addListener((activeInfo) => {
+if (hasSidePanel) {
+  setupSidePanel(browser, chrome, triggerUpload);
+} else {
+  browser.action.onClicked.addListener(() => {
+    triggerUpload();
+  });
+}
+
+browser.tabs.onActivated.addListener(() => {
   activeSession = null;
-  browser.runtime.sendMessage({ type: 'TAB_CHANGED', tabId: activeInfo.tabId }).catch(() => {});
 });
