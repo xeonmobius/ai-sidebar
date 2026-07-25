@@ -8,7 +8,8 @@
     "declarativeNetRequest",
     "activeTab",
     "scripting",
-    "storage"
+    "storage",
+    "clipboardWrite"
   ],
   "host_permissions": ["https://gemini.google.com/*", "<all_urls>", "file:///*"],
   "action": {
