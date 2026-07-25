@@ -68,7 +68,7 @@ copyBtn?.addEventListener('click', async () => {
   copyBtn.textContent = 'Extracting...';
   try {
     await browser.runtime.sendMessage({ type: 'EXTRACT_PAGE' });
-  } catch {
+  } catch (err) {
     copyBtn.textContent = 'Failed';
     copyBtn.disabled = false;
     setTimeout(() => { copyBtn.textContent = 'Copy Website'; }, 2000);
@@ -76,24 +76,53 @@ copyBtn?.addEventListener('click', async () => {
 });
 
 browser.runtime.onMessage.addListener((msg) => {
+  console.log('[sidebar] received message:', msg.type);
   if (msg.type === 'EXTRACT_RESULT') {
+    console.log('[sidebar] EXTRACT_RESULT received, error:', msg.error);
     if (msg.error) {
       copyBtn.textContent = 'Failed';
       copyBtn.disabled = false;
       setTimeout(() => { copyBtn.textContent = 'Copy Website'; }, 2000);
       return;
     }
+    if (msg.pdf) {
+      handlePdfResult(msg.pdf);
+      return;
+    }
     navigator.clipboard.writeText(msg.result.markdown).then(() => {
+      console.log('[sidebar] clipboard write success');
       copyBtn.textContent = 'Copied!';
       copyBtn.disabled = false;
       setTimeout(() => { copyBtn.textContent = 'Copy Website'; }, 2000);
-    }).catch(() => {
+    }).catch((err) => {
+      console.log('[sidebar] clipboard write error:', err);
       copyBtn.textContent = 'Failed';
       copyBtn.disabled = false;
       setTimeout(() => { copyBtn.textContent = 'Copy Website'; }, 2000);
     });
   }
 });
+
+async function handlePdfResult(pdf) {
+  try {
+    const binary = atob(pdf.base64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) {
+      bytes[i] = binary.charCodeAt(i);
+    }
+    const blob = new Blob([bytes], { type: pdf.mimeType || 'application/pdf' });
+
+    const clipboardItem = new ClipboardItem({ [pdf.mimeType || 'application/pdf']: blob });
+    await navigator.clipboard.write([clipboardItem]);
+    console.log('[sidebar] PDF clipboard write success');
+    copyBtn.textContent = 'Copied!';
+  } catch (err) {
+    console.log('[sidebar] PDF clipboard write failed:', err);
+    copyBtn.textContent = 'Failed';
+  }
+  copyBtn.disabled = false;
+  setTimeout(() => { copyBtn.textContent = 'Copy Website'; }, 2000);
+}
 
 browser.tabs.onRemoved.addListener((tabId) => {
   removeIframe(tabId);
