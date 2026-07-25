@@ -3,7 +3,6 @@ import browser from 'webextension-polyfill';
 const GEMINI_BASE = 'https://gemini.google.com/app';
 const iframes = new Map();
 let currentTabId = null;
-let lastUploadTab = null;
 
 async function getPrefs() {
   const result = await browser.storage.local.get('prefs');
@@ -44,50 +43,56 @@ function removeIframe(tabId) {
   }
 }
 
-async function triggerUpload() {
-  const tabs = await browser.tabs.query({ active: true, currentWindow: true });
-  if (!tabs.length) return;
-  const tabId = tabs[0].id;
-
-  if (lastUploadTab === tabId) return;
-  lastUploadTab = tabId;
-
-  await new Promise((r) => setTimeout(r, 500));
-  try {
-    await browser.runtime.sendMessage({ type: 'TRIGGER_UPLOAD' });
-  } catch {
-    await new Promise((r) => setTimeout(r, 2000));
-    await browser.runtime.sendMessage({ type: 'TRIGGER_UPLOAD' }).catch(() => {});
-  }
-}
-
 async function onSidebarLoad() {
   const tabs = await browser.tabs.query({ active: true, currentWindow: true });
   if (tabs.length) currentTabId = tabs[0].id;
 
-  const iframe = createIframe(currentTabId);
+  createIframe(currentTabId);
   showIframe(currentTabId);
 
   await new Promise((r) => setTimeout(r, 4000));
 
   const prefs = await getPrefs();
+  const iframe = getIframe(currentTabId);
   if (prefs.tempChat && iframe?.contentWindow) {
     iframe.contentWindow.postMessage({ type: 'CLICK_TEMP_CHAT' }, '*');
   }
-  await triggerUpload();
 }
 
 onSidebarLoad();
 
-document.getElementById('pdf-input')?.addEventListener('change', (e) => {
-  const file = e.target.files[0];
-  if (!file) return;
-  const iframe = getIframe(currentTabId);
-  if (iframe?.contentWindow) {
-    iframe.contentWindow.postMessage({ type: 'ATTACH_FILE', file }, '*');
+const copyBtn = document.getElementById('copy-website-btn');
+
+copyBtn?.addEventListener('click', async () => {
+  copyBtn.disabled = true;
+  copyBtn.textContent = 'Extracting...';
+  try {
+    await browser.runtime.sendMessage({ type: 'EXTRACT_PAGE' });
+  } catch {
+    copyBtn.textContent = 'Failed';
+    copyBtn.disabled = false;
+    setTimeout(() => { copyBtn.textContent = 'Copy Website'; }, 2000);
   }
-  const picker = document.getElementById('pdf-picker');
-  if (picker) picker.style.display = 'none';
+});
+
+browser.runtime.onMessage.addListener((msg) => {
+  if (msg.type === 'EXTRACT_RESULT') {
+    if (msg.error) {
+      copyBtn.textContent = 'Failed';
+      copyBtn.disabled = false;
+      setTimeout(() => { copyBtn.textContent = 'Copy Website'; }, 2000);
+      return;
+    }
+    navigator.clipboard.writeText(msg.result.markdown).then(() => {
+      copyBtn.textContent = 'Copied!';
+      copyBtn.disabled = false;
+      setTimeout(() => { copyBtn.textContent = 'Copy Website'; }, 2000);
+    }).catch(() => {
+      copyBtn.textContent = 'Failed';
+      copyBtn.disabled = false;
+      setTimeout(() => { copyBtn.textContent = 'Copy Website'; }, 2000);
+    });
+  }
 });
 
 browser.tabs.onRemoved.addListener((tabId) => {
@@ -97,7 +102,6 @@ browser.tabs.onRemoved.addListener((tabId) => {
 browser.tabs.onActivated.addListener(async (activeInfo) => {
   if (activeInfo.tabId === currentTabId) return;
   currentTabId = activeInfo.tabId;
-  lastUploadTab = null;
 
   if (!iframes.has(activeInfo.tabId)) {
     createIframe(activeInfo.tabId);
@@ -109,37 +113,4 @@ browser.tabs.onActivated.addListener(async (activeInfo) => {
     }
   }
   showIframe(activeInfo.tabId);
-  await triggerUpload();
-});
-
-browser.runtime.onMessage.addListener((msg) => {
-  if (msg.type === 'ATTACH_FILE') {
-    const iframe = getIframe(currentTabId);
-    if (iframe?.contentWindow) {
-      const file = new File([msg.markdown], msg.filename, { type: 'text/markdown' });
-      iframe.contentWindow.postMessage(
-        { type: 'ATTACH_FILE', file: file },
-        '*'
-      );
-    }
-  }
-  if (msg.type === 'PDF_PICKER_NEEDED') {
-    const picker = document.getElementById('pdf-picker');
-    if (picker) picker.style.display = 'flex';
-  }
-  if (msg.type === 'ATTACH_PDF') {
-    const iframe = getIframe(currentTabId);
-    if (iframe?.contentWindow) {
-      const binary = atob(msg.base64);
-      const bytes = new Uint8Array(binary.length);
-      for (let i = 0; i < binary.length; i++) {
-        bytes[i] = binary.charCodeAt(i);
-      }
-      const file = new File([bytes], msg.filename, { type: msg.mimeType || 'application/pdf' });
-      iframe.contentWindow.postMessage(
-        { type: 'ATTACH_FILE', file: file },
-        '*'
-      );
-    }
-  }
 });
