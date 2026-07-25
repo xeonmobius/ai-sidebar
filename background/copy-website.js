@@ -5,7 +5,7 @@ export function setupCopyWebsite(browser, chrome) {
       if (!tab) return;
 
       const url = tab.url || '';
-      if (!url || url.startsWith('chrome://') || url.startsWith('about:') || url.startsWith('edge://')) {
+      if (!url || url.startsWith('chrome://') || url.startsWith('about:') || url.startsWith('edge://') || url.startsWith('chrome-extension://')) {
         browser.runtime.sendMessage({ type: 'EXTRACT_RESULT', error: 'Cannot extract from this page' }).catch(() => {});
         return;
       }
