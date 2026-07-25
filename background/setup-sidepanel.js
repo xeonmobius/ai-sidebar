@@ -1,6 +1,6 @@
 const PANEL_PATH = 'sidebar/sidebar.html';
 
-export function setupSidePanel(browser, chrome, triggerUpload) {
+export function setupSidePanel(browser, chrome) {
   chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true });
 
   const enabledTabs = new Set();
@@ -24,7 +24,6 @@ export function setupSidePanel(browser, chrome, triggerUpload) {
       enabledTabs.add(tab.id);
       persistTabs();
       chrome.sidePanel.setOptions({ tabId: tab.id, path: PANEL_PATH, enabled: true });
-      triggerUpload();
     }
   });
 
